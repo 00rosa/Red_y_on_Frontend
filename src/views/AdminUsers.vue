@@ -9,7 +9,7 @@
         <p>Gestión de permisos y acceso al sistema</p>
       </div>
 
-      <!-- Estadísticas -->
+      <!-- Estadísticas (se mantiene igual) -->
       <div class="admin-stats">
         <div class="stat-card">
           <div class="stat-icon" style="background: #1f998f20;">
@@ -74,6 +74,17 @@
           
           <form @submit.prevent="saveUser" class="user-form">
             <div class="form-grid">
+              <div class="form-group">
+                <label>Correo Electrónico:</label>
+                <input 
+                  type="email" 
+                  v-model="userForm.email" 
+                  placeholder="Ej: usuario@empresa.com" 
+                  required
+                >
+                <small class="email-hint">Usuario para inicio de sesión vía correo</small>
+              </div>
+              
               <div class="form-group">
                 <label>Nombre de Usuario:</label>
                 <input 
@@ -140,7 +151,7 @@
               </div>
             </div>
 
-            <!-- PERMISOS ESPECÍFICOS PARA TABLES -->
+            <!-- PERMISOS ESPECÍFICOS PARA TABLES (se mantiene igual) -->
             <div class="permissions-section">
               <h4>Permisos en Página Tables</h4>
               <div class="permissions-grid">
@@ -251,7 +262,7 @@
               <input 
                 type="text" 
                 v-model="searchQuery" 
-                placeholder="Buscar usuario..."
+                placeholder="Buscar usuario o correo..."
                 class="search-input"
               >
               <span class="search-icon">🔍</span>
@@ -263,6 +274,7 @@
               <thead>
                 <tr>
                   <th>Usuario</th>
+                  <th>Correo</th>
                   <th>Rol</th>
                   <th>Estado</th>
                   <th>Permisos Tables</th>
@@ -277,6 +289,11 @@
                       <span class="username">{{ user.username }}</span>
                       <small class="user-id">ID: {{ user.id }}</small>
                       <small class="user-created">Creado: {{ formatDateShortMexico(user.fechaCreacion) }}</small>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="email-info">
+                      <span class="user-email">{{ user.email || 'Sin correo' }}</span>
                     </div>
                   </td>
                   <td>
@@ -340,7 +357,7 @@
                   </td>
                 </tr>
                 <tr v-if="filteredUsers.length === 0">
-                  <td colspan="6" class="no-users">
+                  <td colspan="7" class="no-users">
                     No se encontraron usuarios
                   </td>
                 </tr>
@@ -350,7 +367,7 @@
         </div>
       </div>
 
-      <!-- Modal de permisos -->
+      <!-- Modal de permisos (se mantiene igual) -->
       <div v-if="showPermissionsModal" class="modal-overlay" @click="closeModal">
         <div class="modal-content" @click.stop>
           <div class="modal-header">
@@ -443,8 +460,9 @@ export default {
     const showPermissionsModal = ref(false)
     const selectedUser = ref(null)
 
-    // Formulario de usuario
+    // Formulario de usuario (AGREGADO EMAIL)
     const userForm = ref({
+      email: '',
       username: '',
       password: '',
       role: 'operador',
@@ -462,7 +480,7 @@ export default {
       }
     })
 
-    // Lista de usuarios (cargar desde localStorage)
+    // Lista de usuarios
     const users = ref([])
 
     // Cargar usuarios al iniciar
@@ -470,12 +488,10 @@ export default {
       loadUsers()
     })
 
-    // ========== FUNCIONES PARA HORARIO MÉXICO (UTC-6) ==========
-    
-    // Función para obtener fecha actual en México (UTC-6) en formato YYYY-MM-DD
+    // Funciones para horario México (se mantienen igual)
     const getCurrentDateMexico = () => {
       const now = new Date()
-      const offsetMexico = -6 * 60 // UTC-6 en minutos
+      const offsetMexico = -6 * 60
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
       const fechaMexico = new Date(utc + (offsetMexico * 60000))
       
@@ -486,7 +502,6 @@ export default {
       return `${año}-${mes}-${dia}`
     }
 
-    // Función para convertir fecha a México (UTC-6)
     const getFechaMexico = (fechaString) => {
       if (!fechaString) return new Date()
       
@@ -496,7 +511,6 @@ export default {
       return new Date(utc + (offsetMexico * 60000))
     }
 
-    // Función para formatear fecha en formato mexicano DD/MM/YYYY
     const formatDateMexico = (dateString) => {
       if (!dateString) return ''
       
@@ -518,7 +532,6 @@ export default {
       }
     }
 
-    // Función para formatear fecha corta en México
     const formatDateShortMexico = (dateString) => {
       if (!dateString) return ''
       
@@ -540,28 +553,29 @@ export default {
       }
     }
 
-    // Función para verificar si una fecha ha expirado (en horario México)
     const isExpiredMexico = (user) => {
       if (!user.fechaExpiracion) return false
       
       const hoyMexico = getFechaMexico(getCurrentDateMexico())
-      hoyMexico.setHours(0, 0, 0, 0) // Solo fecha, sin hora
+      hoyMexico.setHours(0, 0, 0, 0)
       
       const expDate = getFechaMexico(user.fechaExpiracion)
-      expDate.setHours(0, 0, 0, 0) // Solo fecha, sin hora
+      expDate.setHours(0, 0, 0, 0)
       
       return expDate < hoyMexico
     }
 
+    // Cargar usuarios
     const loadUsers = () => {
       const savedUsers = localStorage.getItem('redyon_users')
       if (savedUsers) {
         users.value = JSON.parse(savedUsers)
       } else {
-        // Usuario admin por defecto
+        // Usuario admin por defecto (AGREGADO EMAIL)
         const defaultUsers = [
           {
             id: 1,
+            email: 'admin@redyon.com',
             username: 'admin',
             password: 'admin123',
             role: 'administrador',
@@ -581,6 +595,7 @@ export default {
           },
           {
             id: 2,
+            email: 'supervisor@redyon.com',
             username: 'supervisor',
             password: 'super123',
             role: 'supervisor',
@@ -600,6 +615,7 @@ export default {
           },
           {
             id: 3,
+            email: 'operador@redyon.com',
             username: 'operador',
             password: 'oper123',
             role: 'operador',
@@ -634,11 +650,13 @@ export default {
     const supervisorUsers = computed(() => users.value.filter(u => u.role === 'supervisor').length)
     const operatorUsers = computed(() => users.value.filter(u => u.role === 'operador').length)
 
+    // Búsqueda mejorada para incluir email
     const filteredUsers = computed(() => {
       if (!searchQuery.value) return users.value
       const query = searchQuery.value.toLowerCase()
       return users.value.filter(user => 
         user.username.toLowerCase().includes(query) ||
+        (user.email && user.email.toLowerCase().includes(query)) ||
         user.role.toLowerCase().includes(query) ||
         (user.role === 'administrador' && 'administrador'.includes(query)) ||
         (user.role === 'supervisor' && 'supervisor'.includes(query)) ||
@@ -651,14 +669,12 @@ export default {
       sidebarOpen.value = !sidebarOpen.value
     }
 
-    // Función para sincronizar permisos de edición
     const syncEditPermissions = () => {
       if (userForm.value.permissions.editarTodosRegistros) {
         userForm.value.permissions.editarRegistrosPropios = true
       }
     }
 
-    // Función para sincronizar permisos de eliminación
     const syncDeletePermissions = () => {
       if (userForm.value.permissions.eliminarTodosRegistros) {
         userForm.value.permissions.eliminarRegistrosPropios = true
@@ -666,7 +682,6 @@ export default {
     }
 
     const onRoleChange = () => {
-      // Establecer permisos por defecto según el rol
       switch(userForm.value.role) {
         case 'administrador':
           userForm.value.permissions = {
@@ -709,9 +724,22 @@ export default {
       }
     }
 
+    // Guardar usuario (ACTUALIZADO CON EMAIL)
     const saveUser = () => {
+      if (!userForm.value.email.trim()) {
+        alert('El correo electrónico es requerido')
+        return
+      }
+
       if (!userForm.value.username.trim()) {
         alert('El nombre de usuario es requerido')
+        return
+      }
+
+      // Validar formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(userForm.value.email)) {
+        alert('Ingrese un correo electrónico válido')
         return
       }
 
@@ -720,37 +748,36 @@ export default {
         return
       }
 
-      // Verificar si el usuario ya existe (excepto en edición)
+      // Verificar si el usuario o email ya existe
       const userExists = users.value.some(u => 
-        u.username === userForm.value.username && 
+        (u.username === userForm.value.username || u.email === userForm.value.email) && 
         (!editingUser.value || u.id !== editingUser.value.id)
       )
       
       if (userExists) {
-        alert('El nombre de usuario ya existe')
+        alert('El nombre de usuario o correo electrónico ya existe')
         return
       }
 
       if (editingUser.value) {
-        // Actualizar usuario existente
         const index = users.value.findIndex(u => u.id === editingUser.value.id)
         if (index !== -1) {
           const updatedUser = {
             ...users.value[index],
+            email: userForm.value.email,
             username: userForm.value.username,
             role: userForm.value.role,
             activo: userForm.value.activo,
             fechaExpiracion: userForm.value.fechaExpiracion || '',
             permissions: { ...userForm.value.permissions },
-            // Solo actualizar password si se proporcionó
             password: userForm.value.password || users.value[index].password
           }
           users.value[index] = updatedUser
         }
       } else {
-        // Crear nuevo usuario
         const newUser = {
           id: Date.now(),
+          email: userForm.value.email,
           username: userForm.value.username,
           password: userForm.value.password,
           role: userForm.value.role,
@@ -767,18 +794,19 @@ export default {
       alert(editingUser.value ? '✅ Usuario actualizado' : '✅ Usuario creado')
     }
 
+    // Editar usuario (ACTUALIZADO CON EMAIL)
     const editUser = (user) => {
       editingUser.value = user
       userForm.value = {
+        email: user.email || '',
         username: user.username,
-        password: '', // Dejar vacío para no cambiar
+        password: '',
         role: user.role,
         activo: user.activo,
         fechaExpiracion: user.fechaExpiracion || '',
         permissions: { ...user.permissions }
       }
       
-      // Scroll al formulario
       document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' })
     }
 
@@ -787,8 +815,10 @@ export default {
       resetForm()
     }
 
+    // Resetear formulario (ACTUALIZADO CON EMAIL)
     const resetForm = () => {
       userForm.value = {
+        email: '',
         username: '',
         password: '',
         role: 'operador',
@@ -837,7 +867,8 @@ export default {
 
     const cloneUser = (user) => {
       userForm.value = {
-        username: '',
+        email: '',  // Vacío para nuevo usuario
+        username: '', // Vacío para nuevo usuario
         password: '',
         role: user.role,
         activo: user.activo,
@@ -909,6 +940,7 @@ export default {
 </script>
 
 <style scoped>
+
 .admin-page {
   min-height: 100vh;
   background: #f8f9fa;
@@ -1645,4 +1677,34 @@ export default {
   opacity: 0.6;
   color: #999;
 }
+
+.email-hint {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
+.email-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-email {
+  font-size: 13px;
+  color: #444;
+  word-break: break-all;
+}
+
+/* Ajustes responsivos para la tabla con nueva columna */
+@media (max-width: 1200px) {
+  .users-table {
+    overflow-x: auto;
+  }
+  
+  .users-table table {
+    min-width: 1000px;
+  }
+}
+
 </style>

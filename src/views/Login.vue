@@ -9,12 +9,12 @@
       <!-- Formulario -->
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <label for="username">Usuario:</label>
+          <label for="identifier">Usuario o Correo electrónico:</label>
           <input 
             type="text" 
-            id="username" 
-            v-model="form.username" 
-            placeholder="Ingrese su nombre de usuario"
+            id="identifier" 
+            v-model="form.identifier" 
+            placeholder="Ej: juan.perez o juan@email.com"
             required
           >
         </div>
@@ -52,7 +52,7 @@ export default {
   setup() {
     const router = useRouter()
     const form = ref({
-      username: '',
+      identifier: '',
       password: ''
     })
     const error = ref('')
@@ -63,15 +63,15 @@ export default {
         const savedUsers = localStorage.getItem('redyon_users')
         const users = savedUsers ? JSON.parse(savedUsers) : []
         
-        // Buscar usuario
+        // Buscar usuario por username O email
         const user = users.find(u => 
-          u.username === form.value.username && 
+          (u.username === form.value.identifier || u.email === form.value.identifier) && 
           u.password === form.value.password &&
           u.activo === true
         )
         
         if (!user) {
-          error.value = 'Usuario o contraseña incorrectos'
+          error.value = 'Usuario/Correo o contraseña incorrectos'
           return
         }
         
@@ -79,6 +79,9 @@ export default {
         if (user.fechaExpiracion) {
           const expDate = new Date(user.fechaExpiracion)
           const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          expDate.setHours(0, 0, 0, 0)
+          
           if (expDate < today) {
             error.value = 'Su cuenta ha expirado'
             return
@@ -90,6 +93,7 @@ export default {
         localStorage.setItem('userRole', user.role)
         localStorage.setItem('currentUser', JSON.stringify({
           username: user.username,
+          email: user.email || '',
           id: user.id,
           permissions: user.permissions || {}
         }))
