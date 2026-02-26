@@ -9,7 +9,7 @@
         <p>Gestión de permisos y acceso al sistema</p>
       </div>
 
-      <!-- Estadísticas (se mantiene igual) -->
+      <!-- Estadísticas -->
       <div class="admin-stats">
         <div class="stat-card">
           <div class="stat-icon" style="background: #1f998f20;">
@@ -42,16 +42,6 @@
         </div>
         
         <div class="stat-card">
-          <div class="stat-icon" style="background: #f39c1220;">
-            <span>👁️</span>
-          </div>
-          <div class="stat-content">
-            <h4>Supervisores</h4>
-            <p class="stat-value">{{ supervisorUsers }}</p>
-          </div>
-        </div>
-        
-        <div class="stat-card">
           <div class="stat-icon" style="background: #9b59b620;">
             <span>🗂️</span>
           </div>
@@ -74,17 +64,6 @@
           
           <form @submit.prevent="saveUser" class="user-form">
             <div class="form-grid">
-              <div class="form-group">
-                <label>Correo Electrónico:</label>
-                <input 
-                  type="email" 
-                  v-model="userForm.email" 
-                  placeholder="Ej: usuario@empresa.com" 
-                  required
-                >
-                <small class="email-hint">Usuario para inicio de sesión vía correo</small>
-              </div>
-              
               <div class="form-group">
                 <label>Nombre de Usuario:</label>
                 <input 
@@ -113,13 +92,11 @@
                 <label>Rol:</label>
                 <select v-model="userForm.role" @change="onRoleChange" required>
                   <option value="operador">Operador</option>
-                  <option value="supervisor">Supervisor</option>
                   <option value="administrador">Administrador</option>
                 </select>
                 <small class="role-hint">
                   {{
                     userForm.role === 'administrador' ? 'Acceso total al sistema' :
-                    userForm.role === 'supervisor' ? 'Puede editar pero no administrar usuarios' :
                     'Solo lectura y creación básica'
                   }}
                 </small>
@@ -151,7 +128,7 @@
               </div>
             </div>
 
-            <!-- PERMISOS ESPECÍFICOS PARA TABLES (se mantiene igual) -->
+            <!-- PERMISOS ESPECÍFICOS PARA TABLES -->
             <div class="permissions-section">
               <h4>Permisos en Página Tables</h4>
               <div class="permissions-grid">
@@ -167,45 +144,39 @@
                   </div>
                 </div>
                 
-                <!-- Permisos de edición -->
+                <!-- Permisos de solo ver -->
                 <div class="permission-category">
-                  <h5>Edición de Registros</h5>
+                  <h5>Visualización</h5>
                   <div class="permission-item">
                     <label>
-                      <input type="checkbox" v-model="userForm.permissions.editarRegistrosPropios" 
-                        :disabled="userForm.permissions.editarTodosRegistros">
-                      <span>Editar registros propios</span>
+                      <input type="checkbox" v-model="userForm.permissions.soloVer">
+                      <span>Solo Ver registros</span>
                     </label>
-                    <small>Solo los que creó el usuario</small>
-                  </div>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.editarTodosRegistros"
-                        @change="syncEditPermissions">
-                      <span>Editar todos los registros</span>
-                    </label>
-                    <small>Incluye registros de otros usuarios</small>
+                    <small>No puede crear, editar ni eliminar</small>
                   </div>
                 </div>
                 
-                <!-- Permisos de eliminación -->
+                <!-- Permiso de editar comentarios -->
                 <div class="permission-category">
-                  <h5>Eliminación de Registros</h5>
+                  <h5>Comentarios</h5>
                   <div class="permission-item">
                     <label>
-                      <input type="checkbox" v-model="userForm.permissions.eliminarRegistrosPropios"
-                        :disabled="userForm.permissions.eliminarTodosRegistros">
-                      <span>Eliminar registros propios</span>
+                      <input type="checkbox" v-model="userForm.permissions.editarComentarios">
+                      <span>Editar Comentarios</span>
                     </label>
-                    <small>Solo los que creó el usuario</small>
+                    <small>Permite editar comentarios en registros</small>
                   </div>
+                </div>
+                
+                <!-- Permiso de imprimir -->
+                <div class="permission-category">
+                  <h5>Impresión</h5>
                   <div class="permission-item">
                     <label>
-                      <input type="checkbox" v-model="userForm.permissions.eliminarTodosRegistros"
-                        @change="syncDeletePermissions">
-                      <span>Eliminar cualquier registro</span>
+                      <input type="checkbox" v-model="userForm.permissions.imprimir">
+                      <span>Imprimir registros</span>
                     </label>
-                    <small>Incluye registros de otros usuarios</small>
+                    <small>Permite imprimir comprobantes</small>
                   </div>
                 </div>
                 
@@ -262,7 +233,7 @@
               <input 
                 type="text" 
                 v-model="searchQuery" 
-                placeholder="Buscar usuario o correo..."
+                placeholder="Buscar usuario..."
                 class="search-input"
               >
               <span class="search-icon">🔍</span>
@@ -274,7 +245,6 @@
               <thead>
                 <tr>
                   <th>Usuario</th>
-                  <th>Correo</th>
                   <th>Rol</th>
                   <th>Estado</th>
                   <th>Permisos Tables</th>
@@ -287,13 +257,6 @@
                   <td>
                     <div class="user-info">
                       <span class="username">{{ user.username }}</span>
-                      <small class="user-id">ID: {{ user.id }}</small>
-                      <small class="user-created">Creado: {{ formatDateShortMexico(user.fechaCreacion) }}</small>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="email-info">
-                      <span class="user-email">{{ user.email || 'Sin correo' }}</span>
                     </div>
                   </td>
                   <td>
@@ -309,7 +272,7 @@
                   <td>
                     <div class="permissions-summary">
                       <span class="permission-count">
-                        {{ countActivePermissions(user.permissions) }} / 9
+                        {{ countActivePermissions(user.permissions) }} / 7
                       </span>
                       <button 
                         @click="viewPermissions(user)" 
@@ -346,18 +309,11 @@
                       >
                         🗑️
                       </button>
-                      <button 
-                        @click="cloneUser(user)" 
-                        class="btn-clone"
-                        title="Clonar permisos"
-                      >
-                        🐑
-                      </button>
                     </div>
                   </td>
                 </tr>
                 <tr v-if="filteredUsers.length === 0">
-                  <td colspan="7" class="no-users">
+                  <td colspan="6" class="no-users">
                     No se encontraron usuarios
                   </td>
                 </tr>
@@ -367,7 +323,7 @@
         </div>
       </div>
 
-      <!-- Modal de permisos (se mantiene igual) -->
+      <!-- Modal de permisos (actualizado) -->
       <div v-if="showPermissionsModal" class="modal-overlay" @click="closeModal">
         <div class="modal-content" @click.stop>
           <div class="modal-header">
@@ -386,25 +342,28 @@
               </div>
               
               <div class="permission-group">
-                <h4>Edición:</h4>
+                <h4>Visualización:</h4>
                 <ul>
-                  <li :class="selectedUser?.permissions.editarRegistrosPropios ? 'allowed' : 'denied'">
-                    Editar propios: {{ selectedUser?.permissions.editarRegistrosPropios ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                  <li :class="selectedUser?.permissions.editarTodosRegistros ? 'allowed' : 'denied'">
-                    Editar todos: {{ selectedUser?.permissions.editarTodosRegistros ? '✅ Permitido' : '❌ Denegado' }}
+                  <li :class="selectedUser?.permissions.soloVer ? 'allowed' : 'denied'">
+                    Solo Ver: {{ selectedUser?.permissions.soloVer ? '✅ Permitido' : '❌ Denegado' }}
                   </li>
                 </ul>
               </div>
               
               <div class="permission-group">
-                <h4>Eliminación:</h4>
+                <h4>Comentarios:</h4>
                 <ul>
-                  <li :class="selectedUser?.permissions.eliminarRegistrosPropios ? 'allowed' : 'denied'">
-                    Eliminar propios: {{ selectedUser?.permissions.eliminarRegistrosPropios ? '✅ Permitido' : '❌ Denegado' }}
+                  <li :class="selectedUser?.permissions.editarComentarios ? 'allowed' : 'denied'">
+                    Editar Comentarios: {{ selectedUser?.permissions.editarComentarios ? '✅ Permitido' : '❌ Denegado' }}
                   </li>
-                  <li :class="selectedUser?.permissions.eliminarTodosRegistros ? 'allowed' : 'denied'">
-                    Eliminar todos: {{ selectedUser?.permissions.eliminarTodosRegistros ? '✅ Permitido' : '❌ Denegado' }}
+                </ul>
+              </div>
+              
+              <div class="permission-group">
+                <h4>Impresión:</h4>
+                <ul>
+                  <li :class="selectedUser?.permissions.imprimir ? 'allowed' : 'denied'">
+                    Imprimir: {{ selectedUser?.permissions.imprimir ? '✅ Permitido' : '❌ Denegado' }}
                   </li>
                 </ul>
               </div>
@@ -460,9 +419,8 @@ export default {
     const showPermissionsModal = ref(false)
     const selectedUser = ref(null)
 
-    // Formulario de usuario (AGREGADO EMAIL)
+    // Formulario de usuario con nuevo permiso de imprimir
     const userForm = ref({
-      email: '',
       username: '',
       password: '',
       role: 'operador',
@@ -470,10 +428,9 @@ export default {
       fechaExpiracion: '',
       permissions: {
         crearRegistros: true,
-        editarRegistrosPropios: false,
-        editarTodosRegistros: false,
-        eliminarRegistrosPropios: false,
-        eliminarTodosRegistros: false,
+        soloVer: false,
+        editarComentarios: false,
+        imprimir: true,
         modificarCajaInicial: false,
         modificarDineroInicial: false,
         exportarDatos: false
@@ -488,7 +445,7 @@ export default {
       loadUsers()
     })
 
-    // Funciones para horario México (se mantienen igual)
+    // Funciones para horario México
     const getCurrentDateMexico = () => {
       const now = new Date()
       const offsetMexico = -6 * 60
@@ -532,27 +489,6 @@ export default {
       }
     }
 
-    const formatDateShortMexico = (dateString) => {
-      if (!dateString) return ''
-      
-      try {
-        if (dateString.includes('-')) {
-          const [año, mes, dia] = dateString.split('-')
-          return `${dia}/${mes}/${año}`
-        }
-        
-        const fechaMexico = getFechaMexico(dateString)
-        const dia = String(fechaMexico.getDate()).padStart(2, '0')
-        const mes = String(fechaMexico.getMonth() + 1).padStart(2, '0')
-        const año = fechaMexico.getFullYear().toString().slice(-2)
-        
-        return `${dia}/${mes}/${año}`
-      } catch (error) {
-        console.error('Error formateando fecha corta:', dateString, error)
-        return dateString
-      }
-    }
-
     const isExpiredMexico = (user) => {
       if (!user.fechaExpiracion) return false
       
@@ -571,23 +507,20 @@ export default {
       if (savedUsers) {
         users.value = JSON.parse(savedUsers)
       } else {
-        // Usuario admin por defecto (AGREGADO EMAIL)
+        // Usuarios por defecto con nuevo permiso de imprimir
         const defaultUsers = [
           {
             id: 1,
-            email: 'admin@redyon.com',
             username: 'admin',
             password: 'admin123',
             role: 'administrador',
             activo: true,
-            fechaCreacion: getCurrentDateMexico(),
             fechaExpiracion: '',
             permissions: {
               crearRegistros: true,
-              editarRegistrosPropios: true,
-              editarTodosRegistros: true,
-              eliminarRegistrosPropios: true,
-              eliminarTodosRegistros: true,
+              soloVer: false,
+              editarComentarios: true,
+              imprimir: true,
               modificarCajaInicial: true,
               modificarDineroInicial: true,
               exportarDatos: true
@@ -595,39 +528,16 @@ export default {
           },
           {
             id: 2,
-            email: 'supervisor@redyon.com',
-            username: 'supervisor',
-            password: 'super123',
-            role: 'supervisor',
-            activo: true,
-            fechaCreacion: getCurrentDateMexico(),
-            fechaExpiracion: '',
-            permissions: {
-              crearRegistros: true,
-              editarRegistrosPropios: true,
-              editarTodosRegistros: true,
-              eliminarRegistrosPropios: true,
-              eliminarTodosRegistros: false,
-              modificarCajaInicial: false,
-              modificarDineroInicial: true,
-              exportarDatos: true
-            }
-          },
-          {
-            id: 3,
-            email: 'operador@redyon.com',
             username: 'operador',
             password: 'oper123',
             role: 'operador',
             activo: true,
-            fechaCreacion: getCurrentDateMexico(),
             fechaExpiracion: getFechaMexico(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
             permissions: {
               crearRegistros: true,
-              editarRegistrosPropios: false,
-              editarTodosRegistros: false,
-              eliminarRegistrosPropios: false,
-              eliminarTodosRegistros: false,
+              soloVer: false,
+              editarComentarios: true,
+              imprimir: true,
               modificarCajaInicial: false,
               modificarDineroInicial: false,
               exportarDatos: false
@@ -647,20 +557,15 @@ export default {
     const totalUsers = computed(() => users.value.length)
     const activeUsers = computed(() => users.value.filter(u => u.activo).length)
     const adminUsers = computed(() => users.value.filter(u => u.role === 'administrador').length)
-    const supervisorUsers = computed(() => users.value.filter(u => u.role === 'supervisor').length)
     const operatorUsers = computed(() => users.value.filter(u => u.role === 'operador').length)
 
-    // Búsqueda mejorada para incluir email
+    // Búsqueda
     const filteredUsers = computed(() => {
       if (!searchQuery.value) return users.value
       const query = searchQuery.value.toLowerCase()
       return users.value.filter(user => 
         user.username.toLowerCase().includes(query) ||
-        (user.email && user.email.toLowerCase().includes(query)) ||
-        user.role.toLowerCase().includes(query) ||
-        (user.role === 'administrador' && 'administrador'.includes(query)) ||
-        (user.role === 'supervisor' && 'supervisor'.includes(query)) ||
-        (user.role === 'operador' && 'operador'.includes(query))
+        user.role.toLowerCase().includes(query)
       )
     })
 
@@ -669,41 +574,15 @@ export default {
       sidebarOpen.value = !sidebarOpen.value
     }
 
-    const syncEditPermissions = () => {
-      if (userForm.value.permissions.editarTodosRegistros) {
-        userForm.value.permissions.editarRegistrosPropios = true
-      }
-    }
-
-    const syncDeletePermissions = () => {
-      if (userForm.value.permissions.eliminarTodosRegistros) {
-        userForm.value.permissions.eliminarRegistrosPropios = true
-      }
-    }
-
     const onRoleChange = () => {
       switch(userForm.value.role) {
         case 'administrador':
           userForm.value.permissions = {
             crearRegistros: true,
-            editarRegistrosPropios: true,
-            editarTodosRegistros: true,
-            eliminarRegistrosPropios: true,
-            eliminarTodosRegistros: true,
+            soloVer: false,
+            editarComentarios: true,
+            imprimir: true,
             modificarCajaInicial: true,
-            modificarDineroInicial: true,
-            exportarDatos: true
-          }
-          break
-          
-        case 'supervisor':
-          userForm.value.permissions = {
-            crearRegistros: true,
-            editarRegistrosPropios: true,
-            editarTodosRegistros: true,
-            eliminarRegistrosPropios: true,
-            eliminarTodosRegistros: false,
-            modificarCajaInicial: false,
             modificarDineroInicial: true,
             exportarDatos: true
           }
@@ -712,10 +591,9 @@ export default {
         case 'operador':
           userForm.value.permissions = {
             crearRegistros: true,
-            editarRegistrosPropios: false,
-            editarTodosRegistros: false,
-            eliminarRegistrosPropios: false,
-            eliminarTodosRegistros: false,
+            soloVer: false,
+            editarComentarios: true,
+            imprimir: true,
             modificarCajaInicial: false,
             modificarDineroInicial: false,
             exportarDatos: false
@@ -724,22 +602,10 @@ export default {
       }
     }
 
-    // Guardar usuario (ACTUALIZADO CON EMAIL)
+    // Guardar usuario
     const saveUser = () => {
-      if (!userForm.value.email.trim()) {
-        alert('El correo electrónico es requerido')
-        return
-      }
-
       if (!userForm.value.username.trim()) {
         alert('El nombre de usuario es requerido')
-        return
-      }
-
-      // Validar formato de email
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(userForm.value.email)) {
-        alert('Ingrese un correo electrónico válido')
         return
       }
 
@@ -748,14 +614,14 @@ export default {
         return
       }
 
-      // Verificar si el usuario o email ya existe
+      // Verificar si el usuario ya existe
       const userExists = users.value.some(u => 
-        (u.username === userForm.value.username || u.email === userForm.value.email) && 
+        u.username === userForm.value.username && 
         (!editingUser.value || u.id !== editingUser.value.id)
       )
       
       if (userExists) {
-        alert('El nombre de usuario o correo electrónico ya existe')
+        alert('El nombre de usuario ya existe')
         return
       }
 
@@ -764,7 +630,6 @@ export default {
         if (index !== -1) {
           const updatedUser = {
             ...users.value[index],
-            email: userForm.value.email,
             username: userForm.value.username,
             role: userForm.value.role,
             activo: userForm.value.activo,
@@ -777,14 +642,12 @@ export default {
       } else {
         const newUser = {
           id: Date.now(),
-          email: userForm.value.email,
           username: userForm.value.username,
           password: userForm.value.password,
           role: userForm.value.role,
           activo: userForm.value.activo,
           fechaExpiracion: userForm.value.fechaExpiracion || '',
-          permissions: { ...userForm.value.permissions },
-          fechaCreacion: getCurrentDateMexico()
+          permissions: { ...userForm.value.permissions }
         }
         users.value.push(newUser)
       }
@@ -794,11 +657,9 @@ export default {
       alert(editingUser.value ? '✅ Usuario actualizado' : '✅ Usuario creado')
     }
 
-    // Editar usuario (ACTUALIZADO CON EMAIL)
     const editUser = (user) => {
       editingUser.value = user
       userForm.value = {
-        email: user.email || '',
         username: user.username,
         password: '',
         role: user.role,
@@ -815,10 +676,8 @@ export default {
       resetForm()
     }
 
-    // Resetear formulario (ACTUALIZADO CON EMAIL)
     const resetForm = () => {
       userForm.value = {
-        email: '',
         username: '',
         password: '',
         role: 'operador',
@@ -826,10 +685,9 @@ export default {
         fechaExpiracion: '',
         permissions: {
           crearRegistros: true,
-          editarRegistrosPropios: false,
-          editarTodosRegistros: false,
-          eliminarRegistrosPropios: false,
-          eliminarTodosRegistros: false,
+          soloVer: false,
+          editarComentarios: true,
+          imprimir: true,
           modificarCajaInicial: false,
           modificarDineroInicial: false,
           exportarDatos: false
@@ -865,19 +723,6 @@ export default {
       }
     }
 
-    const cloneUser = (user) => {
-      userForm.value = {
-        email: '',  // Vacío para nuevo usuario
-        username: '', // Vacío para nuevo usuario
-        password: '',
-        role: user.role,
-        activo: user.activo,
-        fechaExpiracion: user.fechaExpiracion || '',
-        permissions: { ...user.permissions }
-      }
-      alert('Permisos clonados. Complete los demás datos del usuario.')
-    }
-
     const viewPermissions = (user) => {
       selectedUser.value = user
       showPermissionsModal.value = true
@@ -895,7 +740,6 @@ export default {
     const getRoleName = (role) => {
       switch(role) {
         case 'administrador': return 'Administrador'
-        case 'supervisor': return 'Supervisor'
         case 'operador': return 'Operador'
         default: return role
       }
@@ -912,26 +756,21 @@ export default {
       totalUsers,
       activeUsers,
       adminUsers,
-      supervisorUsers,
       operatorUsers,
       filteredUsers,
       toggleSidebar,
       onRoleChange,
-      syncEditPermissions,
-      syncDeletePermissions,
       saveUser,
       editUser,
       cancelEdit,
       resetForm,
       toggleUserStatus,
       deleteUser,
-      cloneUser,
       viewPermissions,
       closeModal,
       countActivePermissions,
       isExpiredMexico,
       formatDateMexico,
-      formatDateShortMexico,
       getCurrentDateMexico,
       getRoleName
     }
@@ -940,7 +779,6 @@ export default {
 </script>
 
 <style scoped>
-
 .admin-page {
   min-height: 100vh;
   background: #f8f9fa;
@@ -974,7 +812,7 @@ export default {
 /* Estadísticas */
 .admin-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 15px;
   margin-bottom: 30px;
 }
@@ -1343,11 +1181,6 @@ export default {
   color: #333;
 }
 
-.user-id {
-  font-size: 11px;
-  color: #999;
-}
-
 .role-tag {
   padding: 6px 12px;
   border-radius: 20px;
@@ -1359,11 +1192,6 @@ export default {
 .role-tag.administrador {
   background: #e74c3c20;
   color: #c0392b;
-}
-
-.role-tag.supervisor {
-  background: #f39c1220;
-  color: #d35400;
 }
 
 .role-tag.operador {
@@ -1434,7 +1262,7 @@ export default {
 
 /* Botones de acción */
 .actions-cell {
-  width: 200px;
+  width: 150px;
 }
 
 .action-buttons {
@@ -1443,7 +1271,7 @@ export default {
   flex-wrap: wrap;
 }
 
-.btn-edit, .btn-toggle, .btn-delete, .btn-clone {
+.btn-edit, .btn-toggle, .btn-delete {
   background: none;
   border: none;
   cursor: pointer;
@@ -1467,10 +1295,6 @@ export default {
 
 .btn-delete:hover {
   background: #e74c3c20;
-}
-
-.btn-clone:hover {
-  background: #9b59b620;
 }
 
 .no-users {
@@ -1633,23 +1457,7 @@ export default {
     margin: 10px;
   }
 }
-/* Ajustes para la nueva estadística */
-.admin-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 15px;
-  margin-bottom: 30px;
-}
 
-.stat-card:nth-child(4) .stat-icon {
-  background: #f39c1220;
-}
-
-.stat-card:nth-child(5) .stat-icon {
-  background: #9b59b620;
-}
-
-/* Ajustes para campos de fecha */
 .form-group input[type="date"] {
   padding: 12px;
   border: 2px solid #ddd;
@@ -1664,47 +1472,18 @@ export default {
   border-color: #1f998f;
 }
 
-/* Información adicional en tabla */
-.user-created {
-  display: block;
-  font-size: 10px;
-  color: #888;
-  margin-top: 2px;
-}
-
-/* Sincronización visual de permisos */
 .permission-item input:disabled + span {
   opacity: 0.6;
   color: #999;
 }
 
-.email-hint {
-  font-size: 12px;
-  color: #666;
-  font-style: italic;
-}
-
-.email-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.user-email {
-  font-size: 13px;
-  color: #444;
-  word-break: break-all;
-}
-
-/* Ajustes responsivos para la tabla con nueva columna */
 @media (max-width: 1200px) {
   .users-table {
     overflow-x: auto;
   }
   
   .users-table table {
-    min-width: 1000px;
+    min-width: 800px;
   }
 }
-
 </style>

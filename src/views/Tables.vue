@@ -114,9 +114,9 @@
                   type="date" 
                   v-model="form.fecha" 
                   required
-                  :max="getHoyMexico()"
+                  :max="getMaxFecha()"
                 >
-                <small class="field-hint">No puede seleccionar fechas futuras</small>
+                <small class="field-hint">Puede seleccionar cualquier fecha</small>
               </div>
 
               <div class="form-group">
@@ -129,13 +129,14 @@
                   @input="validarNombre"
                   pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+"
                   title="Solo se permiten letras y espacios"
+                  :disabled="soloVer"
                 >
                 <small class="field-hint">Solo letras y espacios</small>
               </div>
 
               <div class="form-group">
                 <label>Concepto:</label>
-                <select v-model="form.concepto" required>
+                <select v-model="form.concepto" required :disabled="soloVer">
                   <option value="">Seleccione concepto</option>
                   <option value="servicio_internet">Servicio de Internet</option>
                   <option value="gastos_operativos">Gastos Operativos</option>
@@ -158,23 +159,24 @@
                 <small class="field-hint">Seleccione un concepto</small>
               </div>
 
+              <!-- Dato Extra (no obligatorio) -->
               <div class="form-group">
-                <label>Folio:</label>
+                <label>Dato Extra:</label>
                 <input 
                   type="text" 
                   v-model="form.folio" 
-                  placeholder="Ej: ABC123" 
-                  required
+                  placeholder="Folio transacciones"
                   @input="validarFolio"
-                  pattern="[A-Za-z0-9]+"
-                  title="Solo letras y números, sin espacios"
+                  pattern="[A-Za-z0-9]*"
+                  title="Solo letras y números, sin espacios (opcional)"
+                  :disabled="soloVer"
                 >
-                <small class="field-hint">Letras y números, sin espacios</small>
+                <small class="field-hint">Opcional - Solo letras y números</small>
               </div>
 
               <div class="form-group">
                 <label>Método de Pago:</label>
-                <select v-model="form.metodoPago" required>
+                <select v-model="form.metodoPago" required :disabled="soloVer">
                   <option value="">Seleccione método</option>
                   <option value="efectivo">Efectivo</option>
                   <option value="tarjeta">Tarjeta</option>
@@ -194,7 +196,7 @@
                     step="0.01" 
                     required
                     :class="form.cantidad >= 0 ? 'positive' : 'negative'"
-                    :disabled="!currentUserPermissions.crearRegistros"
+                    :disabled="!currentUserPermissions.crearRegistros || soloVer"
                   >
                   <span class="amount-hint">
                     {{ form.cantidad >= 0 ? '(Ingreso)' : '(Egreso)' }}
@@ -203,6 +205,9 @@
                 <div class="permission-info">
                   <small v-if="!currentUserPermissions.crearRegistros">
                     ❌ No tienes permiso para crear registros
+                  </small>
+                  <small v-if="soloVer" class="warning">
+                    🔍 Modo solo lectura
                   </small>
                 </div>
               </div>
@@ -213,7 +218,7 @@
               <button 
                 type="submit" 
                 class="btn-primary"
-                :disabled="!currentUserPermissions.crearRegistros || !formValido"
+                :disabled="!currentUserPermissions.crearRegistros || !formValido || soloVer"
               >
                 Agregar
               </button>
@@ -270,146 +275,87 @@
             <table>
               <thead>
                 <tr>
+                  <!-- Columna ID -->
+                  <th>ID</th>
                   <th>Fecha</th>
                   <th>Nombre</th>
                   <th>Concepto</th>
                   <th>Método Pago</th>
-                  <th>Folio</th>
+                  <th>Dato Extra</th>
                   <th>Cantidad</th>
                   <th>Creado por</th>
+                  <!-- Comentarios (editable) -->
+                  <th>Comentarios</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="record in filteredRecords" :key="record.id">
+                <tr v-for="(record, index) in recordsParaMostrar" :key="record.id">
+                  <!-- ID autoincremental (índice + 1) -->
+                  <td class="id-column">{{ index + 1 }}</td>
+                  
+                  <td>{{ formatFechaMexico(record.fecha) }}</td>
+                  <td>{{ record.nombre }}</td>
                   <td>
-                    <input 
-                      v-if="record.editing" 
-                      type="date" 
-                      v-model="record.fecha"
-                      class="edit-input"
-                      :max="getHoyMexico()"
-                    >
-                    <span v-else>{{ formatFechaMexico(record.fecha) }}</span>
-                  </td>
-                  <td>
-                    <input 
-                      v-if="record.editing" 
-                      type="text" 
-                      v-model="record.nombre"
-                      class="edit-input"
-                      @input="validarNombreEditar(record)"
-                      pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+"
-                      title="Solo se permiten letras y espacios"
-                    >
-                    <span v-else>{{ record.nombre }}</span>
-                  </td>
-                  <td>
-                    <select 
-                      v-if="record.editing" 
-                      v-model="record.concepto"
-                      class="edit-input"
-                    >
-                      <option value="">Seleccione concepto</option>
-                      <option value="servicio_internet">Servicio de Internet</option>
-                      <option value="gastos_operativos">Gastos Operativos</option>
-                      <option value="gasto_administrativo">Gasto Administrativo</option>
-                      <option value="viaticos">Viáticos</option>
-                      <option value="propinas">Propinas</option>
-                      <option value="dedicados_clientes">Dedicados-Clientes</option>
-                      <option value="actividades">Actividades</option>
-                      <option value="venta_almacen">Venta de Almacen</option>
-                      <option value="recarga">Recarga</option>
-                      <option value="comisiones">Comisiones</option>
-                      <option value="entrega_efectivo">Entrega Efectivo</option>
-                      <option value="gastos_personales">Gastos Personales</option>
-                      <option value="pagos_tarjetas">Pagos a Tarjetas</option>
-                      <option value="compras">Compras</option>
-                      <option value="dedicados_pagos">Dedicados Pagos</option>
-                      <option value="recibimiento_efectivo">Recibimiento de efectivo</option>
-                      <option value="otros">Otros</option>
-                    </select>
-                    <span v-else>
-                      <span class="concept-tag" :class="record.concepto">
-                        {{ getConceptoLabel(record.concepto) }}
-                      </span>
+                    <span class="concept-tag" :class="record.concepto">
+                      {{ getConceptoLabel(record.concepto) }}
                     </span>
                   </td>
                   <td>
-                    <select 
-                      v-if="record.editing" 
-                      v-model="record.metodoPago"
-                      class="edit-input"
-                    >
-                      <option value="">Seleccione método</option>
-                      <option value="efectivo">Efectivo</option>
-                      <option value="tarjeta">Tarjeta</option>
-                      <option value="terminal">Terminal</option>
-                      <option value="transferencia">Transferencia</option>
-                    </select>
-                    <span v-else>
-                      <span class="payment-tag">{{ getMetodoPagoLabel(record.metodoPago) }}</span>
-                    </span>
+                    <span class="payment-tag">{{ getMetodoPagoLabel(record.metodoPago) }}</span>
                   </td>
-                  <td>
-                    <input 
-                      v-if="record.editing" 
-                      type="text" 
-                      v-model="record.folio"
-                      class="edit-input"
-                      @input="validarFolioEditar(record)"
-                      pattern="[A-Za-z0-9]+"
-                      title="Solo letras y números, sin espacios"
-                    >
-                    <span v-else>{{ record.folio }}</span>
-                  </td>
+                  <td>{{ record.folio || '-' }}</td>
                   <td :class="record.cantidad >= 0 ? 'positive' : 'negative'">
-                    <input 
-                      v-if="record.editing" 
-                      type="number" 
-                      v-model.number="record.cantidad"
-                      step="0.01"
-                      class="edit-input"
-                      :class="record.cantidad >= 0 ? 'positive' : 'negative'"
-                    >
-                    <span v-else>
-                      ${{ Math.abs(record.cantidad).toFixed(2) }}
-                    </span>
+                    ${{ Math.abs(record.cantidad).toFixed(2) }}
                   </td>
                   <td>
                     <small>{{ record.creadoPor || 'Sistema' }}</small>
                   </td>
-                  <td class="actions-cell">
-                    <div v-if="record.editing" class="edit-actions">
-                      <button @click="saveEdit(record)" class="btn-save" title="Guardar">
-                        💾
-                      </button>
-                      <button @click="cancelEdit(record)" class="btn-cancel" title="Cancelar">
-                        ❌
-                      </button>
+                  <!-- Columna de comentarios con control de permisos -->
+                  <td class="comments-cell">
+                    <div v-if="record.editandoComentario" class="comment-edit">
+                      <input 
+                        type="text" 
+                        v-model="record.comentarioTemp" 
+                        class="comment-input"
+                        placeholder="Escribir comentario..."
+                        @keyup.enter="guardarComentarioEdit(record)"
+                        @keyup.esc="cancelarComentarioEdit(record)"
+                        ref="comentarioInput"
+                        :disabled="!puedeEditarComentarios"
+                      >
+                      <div v-if="puedeEditarComentarios" class="comment-actions">
+                        <button @click="guardarComentarioEdit(record)" class="btn-comment-save" title="Guardar">✓</button>
+                        <button @click="cancelarComentarioEdit(record)" class="btn-comment-cancel" title="Cancelar">✗</button>
+                      </div>
                     </div>
-                    <div v-else class="record-actions">
+                    <div v-else class="comment-display">
+                      <span class="comment-text">{{ record.comentario || 'Sin comentario' }}</span>
                       <button 
-                        @click="startEdit(record)" 
-                        class="btn-edit" 
-                        title="Editar"
-                        :disabled="!canEditRecord(record)"
+                        v-if="puedeEditarComentarios" 
+                        @click="editarComentario(record)" 
+                        class="btn-edit-comment" 
+                        title="Editar comentario"
                       >
                         ✏️
                       </button>
-                      <button 
-                        @click="deleteRecord(record.id)" 
-                        class="btn-delete" 
-                        title="Eliminar"
-                        :disabled="!canDeleteRecord(record)"
-                      >
-                        🗑️
-                      </button>
                     </div>
                   </td>
+                  <!-- Botón de imprimir con control de permiso -->
+                  <td class="print-cell">
+                    <button 
+                      v-if="puedeImprimir"
+                      @click="imprimirRegistro(record, index)" 
+                      class="btn-print" 
+                      title="Imprimir"
+                    >
+                      🖨️
+                    </button>
+                    <span v-else class="no-permission">🚫</span>
+                  </td>
                 </tr>
-                <tr v-if="filteredRecords.length === 0">
-                  <td colspan="8" class="no-records">
+                <tr v-if="recordsParaMostrar.length === 0">
+                  <td colspan="10" class="no-records">
                     No hay registros para mostrar
                   </td>
                 </tr>
@@ -423,7 +369,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/Layout/Header.vue'
 import AppSidebar from '@/components/Layout/Sidebar.vue'
@@ -437,20 +383,20 @@ export default {
   setup() {
     const router = useRouter()
     const sidebarOpen = ref(false)
+    const comentarioInput = ref(null)
     
     // Widgets de caja
-    const cajaInicial = ref(10000) // Presupuesto inicial total
-    const dineroInicial = ref(5000) // Dinero disponible inicial (parte de la caja)
+    const cajaInicial = ref(10000)
+    const dineroInicial = ref(5000)
     const nuevaCajaInicial = ref('')
     const nuevoDineroInicial = ref('')
     
-    // Permisos del usuario
+    // Permisos del usuario (ACTUALIZADO con permiso de imprimir)
     const currentUserPermissions = ref({
       crearRegistros: false,
-      editarRegistrosPropios: false,
-      editarTodosRegistros: false,
-      eliminarRegistrosPropios: false,
-      eliminarTodosRegistros: false,
+      soloVer: false,
+      editarComentarios: false,
+      imprimir: false,
       modificarCajaInicial: false,
       modificarDineroInicial: false,
       exportarDatos: false
@@ -461,19 +407,19 @@ export default {
     // Función para verificar si hoy es sábado
     const esSabado = computed(() => {
       const hoy = new Date()
-      // Ajustar a zona horaria de México
       const offsetMexico = -6 * 60
       const utc = hoy.getTime() + (hoy.getTimezoneOffset() * 60000)
       const hoyMexico = new Date(utc + (offsetMexico * 60000))
-      
-      // 6 = Sábado (0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
       return hoyMexico.getDay() === 6
     })
 
-    // Función para obtener la fecha actual en México (UTC-6) YYYY-MM-DD
+    const getMaxFecha = () => {
+      return undefined
+    }
+
     const getHoyMexico = () => {
       const now = new Date()
-      const offsetMexico = -6 * 60 // UTC-6 en minutos
+      const offsetMexico = -6 * 60
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
       const fechaMexico = new Date(utc + (offsetMexico * 60000))
       
@@ -484,7 +430,6 @@ export default {
       return `${año}-${mes}-${dia}`
     }
 
-    // Función para convertir fecha a México (UTC-6)
     const getFechaMexico = (fechaString) => {
       if (!fechaString) return new Date()
       
@@ -494,7 +439,6 @@ export default {
       return new Date(utc + (offsetMexico * 60000))
     }
 
-    // Función para formatear fecha en formato mexicano DD/MM/YYYY
     const formatFechaMexico = (dateString) => {
       if (!dateString) return ''
       
@@ -516,7 +460,6 @@ export default {
       }
     }
 
-    // Función para validar que solo contiene letras y espacios
     const validarNombre = (event) => {
       const input = event.target
       const valor = input.value
@@ -528,40 +471,21 @@ export default {
       }
     }
 
-    // Función para validar que solo contiene letras y números (sin espacios)
+    // Validación de folio (opcional)
     const validarFolio = (event) => {
       const input = event.target
       const valor = input.value
       const regex = /^[A-Za-z0-9]*$/
       
-      if (!regex.test(valor)) {
+      if (valor && !regex.test(valor)) {
         input.value = valor.replace(/[^A-Za-z0-9]/g, '')
         form.value.folio = input.value
       }
       
-      input.value = input.value.toUpperCase()
-      form.value.folio = input.value
-    }
-
-    // Funciones de validación para edición
-    const validarNombreEditar = (record) => {
-      const valor = record.nombre
-      const regex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/
-      
-      if (!regex.test(valor)) {
-        record.nombre = valor.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g, '')
+      if (input.value) {
+        input.value = input.value.toUpperCase()
+        form.value.folio = input.value
       }
-    }
-
-    const validarFolioEditar = (record) => {
-      const valor = record.folio
-      const regex = /^[A-Za-z0-9]*$/
-      
-      if (!regex.test(valor)) {
-        record.folio = valor.replace(/[^A-Za-z0-9]/g, '')
-      }
-      
-      record.folio = record.folio.toUpperCase()
     }
 
     const form = ref({
@@ -577,17 +501,15 @@ export default {
     const filterPeriods = ['Día', 'Semana', 'Mes', 'Año', 'Todos']
     const activeFilter = ref('Todos')
 
-    // Cargar datos guardados al iniciar
     onMounted(() => {
       cargarDesdeLocalStorage()
       loadUserPermissions()
       verificarReinicioSabado()
     })
 
-    // FUNCIÓN MEJORADA PARA CARGAR PERMISOS
+    // ACTUALIZADO: Carga los nuevos permisos (incluyendo imprimir)
     const loadUserPermissions = () => {
       try {
-        // Obtener el username
         let username = localStorage.getItem('currentUsername')
         
         if (!username) {
@@ -609,24 +531,20 @@ export default {
         
         currentUsername.value = username
         
-        // Cargar permisos desde redyon_users
         const savedUsers = localStorage.getItem('redyon_users')
         
         if (savedUsers) {
           try {
             const users = JSON.parse(savedUsers)
-            
-            // Buscar el usuario actual
             const currentUser = users.find(u => u.username === username)
             
             if (currentUser && currentUser.permissions) {
-              // Asignar permisos SIN filtros avanzados
+              // Mapear los nuevos permisos
               currentUserPermissions.value = {
                 crearRegistros: currentUser.permissions.crearRegistros || false,
-                editarRegistrosPropios: currentUser.permissions.editarRegistrosPropios || false,
-                editarTodosRegistros: currentUser.permissions.editarTodosRegistros || false,
-                eliminarRegistrosPropios: currentUser.permissions.eliminarRegistrosPropios || false,
-                eliminarTodosRegistros: currentUser.permissions.eliminarTodosRegistros || false,
+                soloVer: currentUser.permissions.soloVer || false,
+                editarComentarios: currentUser.permissions.editarComentarios || false,
+                imprimir: currentUser.permissions.imprimir || false,
                 modificarCajaInicial: currentUser.permissions.modificarCajaInicial || false,
                 modificarDineroInicial: currentUser.permissions.modificarDineroInicial || false,
                 exportarDatos: currentUser.permissions.exportarDatos || false
@@ -650,17 +568,30 @@ export default {
     const setDefaultPermissions = () => {
       currentUserPermissions.value = {
         crearRegistros: false,
-        editarRegistrosPropios: false,
-        editarTodosRegistros: false,
-        eliminarRegistrosPropios: false,
-        eliminarTodosRegistros: false,
+        soloVer: false,
+        editarComentarios: false,
+        imprimir: false,
         modificarCajaInicial: false,
         modificarDineroInicial: false,
         exportarDatos: false
       }
     }
 
-    // Función para verificar si se debe reiniciar la caja (cada sábado)
+    // Computed para modo solo ver
+    const soloVer = computed(() => {
+      return currentUserPermissions.value.soloVer || false
+    })
+
+    // Computed para editar comentarios
+    const puedeEditarComentarios = computed(() => {
+      return currentUserPermissions.value.editarComentarios || false
+    })
+
+    // Computed para imprimir
+    const puedeImprimir = computed(() => {
+      return currentUserPermissions.value.imprimir || false
+    })
+
     const verificarReinicioSabado = () => {
       if (!esSabado.value) return
       
@@ -668,9 +599,7 @@ export default {
       const hoy = getHoyMexico()
       
       if (ultimoSabadoGuardado !== hoy) {
-        // Es un nuevo sábado, reiniciar la caja y registros
         if (confirm('Hoy es sábado. ¿Desea reiniciar la caja inicial y todos los registros?')) {
-          // Reiniciar caja inicial
           const nuevaCaja = prompt(
             'Ingrese el nuevo valor para la Caja Inicial:',
             '10000'
@@ -678,11 +607,8 @@ export default {
           
           if (nuevaCaja !== null && !isNaN(parseFloat(nuevaCaja))) {
             cajaInicial.value = parseFloat(nuevaCaja)
-            // Reiniciar dinero inicial también (por defecto 50% de la caja)
             dineroInicial.value = Math.round(parseFloat(nuevaCaja) * 0.5)
-            // Limpiar registros
             records.value = []
-            // Guardar que hoy ya se reinició
             localStorage.setItem('redyon_ultimoSabado', hoy)
             guardarEnLocalStorage()
             alert('✅ Caja y registros reiniciados para el nuevo período')
@@ -701,34 +627,40 @@ export default {
       if (savedDinero) dineroInicial.value = parseFloat(savedDinero)
       if (savedRecords) {
         records.value = JSON.parse(savedRecords)
-        ordenarRegistrosPorFecha()
+        // Asegurar que todos los registros tengan los campos necesarios
+        records.value.forEach(record => {
+          if (!record.hasOwnProperty('comentario')) {
+            record.comentario = ''
+          }
+          if (!record.hasOwnProperty('editandoComentario')) {
+            record.editandoComentario = false
+          }
+          if (!record.hasOwnProperty('comentarioTemp')) {
+            record.comentarioTemp = record.comentario || ''
+          }
+        })
       }
       
-      // Si no hay fecha de sábado guardada, guardar la actual
       if (!savedSabado) {
         localStorage.setItem('redyon_ultimoSabado', getHoyMexico())
       }
     }
 
-    const ordenarRegistrosPorFecha = () => {
-      records.value.sort((a, b) => {
-        const fechaA = getFechaMexico(a.fecha)
-        const fechaB = getFechaMexico(b.fecha)
-        return fechaB - fechaA
-      })
-    }
-
     const guardarEnLocalStorage = () => {
+      // Limpiar campos temporales antes de guardar
+      const recordsParaGuardar = records.value.map(record => {
+        const { editandoComentario, comentarioTemp, ...recordLimpio } = record
+        return recordLimpio
+      })
       localStorage.setItem('redyon_cajaInicial', cajaInicial.value)
       localStorage.setItem('redyon_dineroInicial', dineroInicial.value)
-      localStorage.setItem('redyon_records', JSON.stringify(records.value))
+      localStorage.setItem('redyon_records', JSON.stringify(recordsParaGuardar))
     }
 
     const toggleSidebar = () => {
       sidebarOpen.value = !sidebarOpen.value
     }
 
-    // Función para actualizar caja inicial
     const actualizarCajaInicial = () => {
       if (!nuevaCajaInicial.value || nuevaCajaInicial.value <= 0) {
         alert('Ingrese un monto válido para la caja inicial')
@@ -738,7 +670,6 @@ export default {
       const nuevaCaja = parseFloat(nuevaCajaInicial.value)
       cajaInicial.value = nuevaCaja
       
-      // Si el dinero inicial actual excede la nueva caja, ajustarlo
       if (dineroInicial.value > nuevaCaja) {
         dineroInicial.value = nuevaCaja
         alert(`Caja inicial actualizada. Dinero inicial ajustado a $${formatCurrency(nuevaCaja)}`)
@@ -750,7 +681,6 @@ export default {
       guardarEnLocalStorage()
     }
 
-    // Función para actualizar dinero inicial
     const actualizarDineroInicial = () => {
       if (!nuevoDineroInicial.value || nuevoDineroInicial.value <= 0) {
         alert('Ingrese un monto válido para el dinero inicial')
@@ -770,7 +700,6 @@ export default {
       alert(`Dinero inicial actualizado a $${formatCurrency(nuevoDinero)}`)
     }
 
-    // Cálculo del dinero final (dinero inicial + sumatoria de registros)
     const dineroFinal = computed(() => {
       let total = dineroInicial.value
       records.value.forEach(record => {
@@ -779,7 +708,6 @@ export default {
       return total
     })
 
-    // Totales por tipo
     const totalIngresos = computed(() => {
       return records.value
         .filter(r => r.cantidad > 0)
@@ -792,11 +720,9 @@ export default {
         .reduce((sum, r) => sum + r.cantidad, 0)
     })
 
-    // Validación del formulario
     const formValido = computed(() => {
       return form.value.nombre.trim() !== '' &&
              form.value.concepto !== '' &&
-             form.value.folio.trim() !== '' &&
              form.value.metodoPago !== '' &&
              form.value.cantidad !== 0
     })
@@ -808,13 +734,17 @@ export default {
           return
         }
 
-        // Validaciones de formato
+        if (soloVer.value) {
+          alert('❌ Modo solo lectura - No puedes crear registros')
+          return
+        }
+
         if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(form.value.nombre)) {
           alert('❌ El nombre solo puede contener letras y espacios')
           return
         }
 
-        if (!/^[A-Za-z0-9]+$/.test(form.value.folio)) {
+        if (form.value.folio && !/^[A-Za-z0-9]+$/.test(form.value.folio)) {
           alert('❌ El folio solo puede contener letras y números (sin espacios)')
           return
         }
@@ -829,18 +759,11 @@ export default {
           return
         }
 
-        // Validar fecha no futura
-        const fechaSeleccionada = getFechaMexico(form.value.fecha)
-        const hoyMexico = getFechaMexico(getHoyMexico())
-        fechaSeleccionada.setHours(0, 0, 0, 0)
-        hoyMexico.setHours(0, 0, 0, 0)
-        
-        if (fechaSeleccionada > hoyMexico) {
-          alert('❌ No puede seleccionar fechas futuras')
+        if (!form.value.fecha) {
+          alert('❌ Debe seleccionar una fecha')
           return
         }
 
-        // Validar que no exceda el presupuesto si es egreso
         if (form.value.cantidad < 0) {
           const saldoDespuesEgreso = dineroFinal.value + form.value.cantidad
           if (saldoDespuesEgreso < 0) {
@@ -852,16 +775,18 @@ export default {
         const newRecord = {
           id: Date.now(),
           ...form.value,
-          folio: form.value.folio.toUpperCase(),
-          editing: false,
-          creadoPor: currentUsername.value
+          folio: form.value.folio ? form.value.folio.toUpperCase() : '',
+          comentario: '',
+          editandoComentario: false,
+          comentarioTemp: '',
+          creadoPor: currentUsername.value,
+          fechaCreacion: new Date().toISOString()
         }
         
-        records.value.unshift(newRecord)
-        ordenarRegistrosPorFecha()
+        records.value.push(newRecord)
+        
         guardarEnLocalStorage()
 
-        // Resetear formulario
         form.value = {
           fecha: getHoyMexico(),
           nombre: '',
@@ -890,7 +815,7 @@ export default {
       activeFilter.value = period
     }
 
-    const filteredRecords = computed(() => {
+    const recordsParaMostrar = computed(() => {
       let registrosFiltrados = [...records.value]
       
       if (activeFilter.value !== 'Todos') {
@@ -914,134 +839,128 @@ export default {
       }
       
       return registrosFiltrados.sort((a, b) => {
-        const fechaA = getFechaMexico(a.fecha)
-        const fechaB = getFechaMexico(b.fecha)
-        return fechaB - fechaA
+        const fechaA = a.fechaCreacion ? new Date(a.fechaCreacion) : a.id
+        const fechaB = b.fechaCreacion ? new Date(b.fechaCreacion) : b.id
+        return fechaA - fechaB
       })
     })
 
-    // FUNCIÓN PARA VERIFICAR SI PUEDE EDITAR
-    const canEditRecord = (record) => {
-      const esRegistroPropio = record.creadoPor === currentUsername.value
-      
-      if (currentUserPermissions.value.editarTodosRegistros === true) {
-        return true
-      }
-      
-      if (esRegistroPropio && currentUserPermissions.value.editarRegistrosPropios === true) {
-        return true
-      }
-      
-      return false
-    }
-
-    // FUNCIÓN PARA VERIFICAR SI PUEDE ELIMINAR
-    const canDeleteRecord = (record) => {
-      const esRegistroPropio = record.creadoPor === currentUsername.value
-      
-      if (currentUserPermissions.value.eliminarTodosRegistros === true) {
-        return true
-      }
-      
-      if (esRegistroPropio && currentUserPermissions.value.eliminarRegistrosPropios === true) {
-        return true
-      }
-      
-      return false
-    }
-
-    // FUNCIÓN PARA INICIAR EDICIÓN
-    const startEdit = (record) => {
-      if (!canEditRecord(record)) {
-        alert('❌ No tienes permiso para editar este registro')
+    // Funciones para editar comentarios (controladas por permiso)
+    const editarComentario = (record) => {
+      if (!puedeEditarComentarios.value) {
+        alert('❌ No tienes permiso para editar comentarios')
         return
       }
-      
-      record.editing = true
-      record.originalData = { ...record }
-    }
-
-    const saveEdit = (record) => {
-      if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(record.nombre)) {
-        alert('❌ El nombre solo puede contener letras y espacios')
-        return
-      }
-
-      if (!/^[A-Za-z0-9]+$/.test(record.folio)) {
-        alert('❌ El folio solo puede contener letras y números (sin espacios)')
-        return
-      }
-
-      if (!record.concepto) {
-        alert('❌ Debe seleccionar un concepto')
-        return
-      }
-
-      if (!record.metodoPago) {
-        alert('❌ Debe seleccionar un método de pago')
-        return
-      }
-
-      // Validar fecha no futura
-      const fechaSeleccionada = getFechaMexico(record.fecha)
-      const hoyMexico = getFechaMexico(getHoyMexico())
-      fechaSeleccionada.setHours(0, 0, 0, 0)
-      hoyMexico.setHours(0, 0, 0, 0)
-      
-      if (fechaSeleccionada > hoyMexico) {
-        alert('❌ No puede seleccionar fechas futuras')
-        cancelEdit(record)
-        return
-      }
-
-      // Convertir folio a mayúsculas
-      record.folio = record.folio.toUpperCase()
-
-      // Validar que no exceda el presupuesto si cambió a egreso
-      const oldAmount = record.originalData.cantidad
-      const newAmount = record.cantidad
-      
-      if (newAmount < oldAmount) {
-        const diferencia = newAmount - oldAmount
-        if (dineroFinal.value + diferencia < 0) {
-          alert('❌ Fondos insuficientes para este cambio')
-          cancelEdit(record)
-          return
+      record.comentarioTemp = record.comentario || ''
+      record.editandoComentario = true
+      // Enfocar el input después de que se renderice
+      nextTick(() => {
+        const inputs = document.querySelectorAll('.comment-input')
+        if (inputs.length > 0) {
+          inputs[inputs.length - 1].focus()
         }
+      })
+    }
+
+    const guardarComentarioEdit = (record) => {
+      if (!puedeEditarComentarios.value) {
+        alert('❌ No tienes permiso para editar comentarios')
+        return
       }
-      
-      record.editing = false
-      delete record.originalData
-      ordenarRegistrosPorFecha()
+      record.comentario = record.comentarioTemp
+      record.editandoComentario = false
       guardarEnLocalStorage()
-      alert('✅ Registro actualizado')
     }
 
-    const cancelEdit = (record) => {
-      if (record.originalData) {
-        Object.assign(record, record.originalData)
-        record.editing = false
-        delete record.originalData
-      }
+    const cancelarComentarioEdit = (record) => {
+      record.editandoComentario = false
+      record.comentarioTemp = record.comentario || ''
     }
 
-    const deleteRecord = (id) => {
-      const record = records.value.find(r => r.id === id)
-      if (!record) return
-      
-      if (!canDeleteRecord(record)) {
-        alert('❌ No tienes permiso para eliminar este registro')
+    // Función para guardar comentarios (mantener compatibilidad)
+    const guardarComentario = (record) => {
+      guardarEnLocalStorage()
+    }
+
+    // Función para imprimir registro (con control de permiso)
+    const imprimirRegistro = (record, index) => {
+      if (!puedeImprimir.value) {
+        alert('❌ No tienes permiso para imprimir')
         return
       }
+
+      const ventanaImpresion = window.open('', '_blank')
       
-      if (confirm('¿Está seguro de eliminar este registro?')) {
-        const index = records.value.findIndex(r => r.id === id)
-        if (index !== -1) {
-          records.value.splice(index, 1)
-          guardarEnLocalStorage()
-          alert('✅ Registro eliminado')
-        }
-      }
+      const contenido = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Registro #${index + 1}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #1f998f; }
+            .registro { border: 1px solid #ddd; padding: 20px; border-radius: 8px; }
+            .campo { margin-bottom: 10px; }
+            .label { font-weight: bold; color: #666; }
+            .valor { margin-left: 10px; }
+            .positivo { color: #27ae60; }
+            .negativo { color: #e74c3c; }
+            @media print {
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Comprobante de Registro</h1>
+          <div class="registro">
+            <div class="campo">
+              <span class="label">ID:</span>
+              <span class="valor">${index + 1}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Fecha:</span>
+              <span class="valor">${formatFechaMexico(record.fecha)}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Nombre:</span>
+              <span class="valor">${record.nombre}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Concepto:</span>
+              <span class="valor">${getConceptoLabel(record.concepto)}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Dato Extra:</span>
+              <span class="valor">${record.folio || '-'}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Método de Pago:</span>
+              <span class="valor">${getMetodoPagoLabel(record.metodoPago)}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Cantidad:</span>
+              <span class="valor ${record.cantidad >= 0 ? 'positivo' : 'negativo'}">
+                $${Math.abs(record.cantidad).toFixed(2)} ${record.cantidad >= 0 ? '(Ingreso)' : '(Egreso)'}
+              </span>
+            </div>
+            <div class="campo">
+              <span class="label">Creado por:</span>
+              <span class="valor">${record.creadoPor || 'Sistema'}</span>
+            </div>
+            <div class="campo">
+              <span class="label">Comentarios:</span>
+              <span class="valor">${record.comentario || '-'}</span>
+            </div>
+          </div>
+          <div style="margin-top: 20px; text-align: center;">
+            <button onclick="window.print()">Imprimir</button>
+          </div>
+        </body>
+        </html>
+      `
+      
+      ventanaImpresion.document.write(contenido)
+      ventanaImpresion.document.close()
     }
 
     const formatCurrency = (amount) => {
@@ -1081,7 +1000,6 @@ export default {
       return labels[metodo] || metodo
     }
 
-    // Observar cambios en records
     watch(records, () => {
       guardarEnLocalStorage()
     }, { deep: true })
@@ -1101,9 +1019,13 @@ export default {
       records,
       filterPeriods,
       activeFilter,
-      filteredRecords,
+      recordsParaMostrar,
       formValido,
       esSabado,
+      soloVer,
+      puedeEditarComentarios,
+      puedeImprimir,
+      comentarioInput,
       toggleSidebar,
       actualizarCajaInicial,
       actualizarDineroInicial,
@@ -1116,23 +1038,155 @@ export default {
       getMetodoPagoLabel,
       validarNombre,
       validarFolio,
-      validarNombreEditar,
-      validarFolioEditar,
-      startEdit,
-      saveEdit,
-      cancelEdit,
-      deleteRecord,
-      canEditRecord,
-      canDeleteRecord,
+      guardarComentario,
+      imprimirRegistro,
+      editarComentario,
+      guardarComentarioEdit,
+      cancelarComentarioEdit,
       guardarEnLocalStorage,
-      getHoyMexico
+      getHoyMexico,
+      getMaxFecha
     }
   }
 }
 </script>
 
 <style scoped>
-/* EL CSS SE MANTIENE IGUAL - ES CORRECTO */
+.id-column {
+  font-weight: 600;
+  color: #1f998f;
+  text-align: center;
+}
+
+.comments-cell {
+  min-width: 200px;
+}
+
+.comment-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.comment-text {
+  flex: 1;
+  font-size: 13px;
+  color: #333;
+  word-break: break-word;
+  padding: 4px 0;
+}
+
+.btn-edit-comment {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.btn-edit-comment:hover {
+  background: #1f998f20;
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.comment-edit {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.comment-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 2px solid #1f998f;
+  border-radius: 4px;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.comment-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(31, 153, 143, 0.2);
+}
+
+.comment-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.btn-comment-save, .btn-comment-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-comment-save {
+  color: #27ae60;
+}
+
+.btn-comment-save:hover {
+  background: #27ae6020;
+  transform: scale(1.1);
+}
+
+.btn-comment-cancel {
+  color: #e74c3c;
+}
+
+.btn-comment-cancel:hover {
+  background: #e74c3c20;
+  transform: scale(1.1);
+}
+
+.print-cell {
+  text-align: center;
+}
+
+.btn-print {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.btn-print:hover {
+  background: #1f998f20;
+  transform: scale(1.1);
+}
+
+/* Ajuste de tabla para nuevas columnas */
+.records-table th {
+  white-space: nowrap;
+}
+
+.records-table td {
+  vertical-align: middle;
+}
+
+@media (max-width: 1200px) {
+  .records-table {
+    overflow-x: auto;
+    display: block;
+  }
+  
+  .records-table table {
+    min-width: 1300px;
+  }
+}
+
+/* Resto del CSS original se mantiene igual */
 .tables-page {
   min-height: 100vh;
   background: #f8f9fa;
@@ -1147,7 +1201,12 @@ export default {
 .main-content.sidebar-open {
   margin-left: 280px;
 }
-
+.no-permission {
+  opacity: 0.3;
+  font-size: 16px;
+  display: inline-block;
+  padding: 6px 10px;
+}
 .page-header {
   margin-bottom: 30px;
 }
@@ -1480,7 +1539,6 @@ export default {
   opacity: 0.7;
 }
 
-/* Resumen de Caja */
 .caja-summary {
   border-top: 2px solid #f5f5f5;
   padding-top: 20px;
@@ -1583,22 +1641,6 @@ export default {
   padding: 12px;
   border-bottom: 1px solid #eee;
   vertical-align: middle;
-}
-
-.edit-input {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.edit-input.positive {
-  border-color: #27ae60;
-}
-
-.edit-input.negative {
-  border-color: #e74c3c;
 }
 
 .concept-tag {
@@ -1714,51 +1756,6 @@ export default {
   font-weight: 600;
 }
 
-.actions-cell {
-  width: 120px;
-}
-
-.record-actions, .edit-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-edit, .btn-delete, .btn-save, .btn-cancel {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 6px 10px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-edit:hover:not(:disabled) {
-  background: #3498db20;
-}
-
-.btn-edit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-delete:hover:not(:disabled) {
-  background: #e74c3c20;
-}
-
-.btn-delete:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-save:hover {
-  background: #27ae6020;
-}
-
-.btn-cancel:hover {
-  background: #95a5a620;
-}
-
 .no-records {
   text-align: center;
   color: #666;
@@ -1766,7 +1763,6 @@ export default {
   font-style: italic;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .main-content.sidebar-open {
     margin-left: 0;

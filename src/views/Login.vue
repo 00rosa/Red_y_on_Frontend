@@ -9,12 +9,12 @@
       <!-- Formulario -->
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
-          <label for="identifier">Usuario o Correo electrónico:</label>
+          <label for="username">Usuario:</label>
           <input 
             type="text" 
-            id="identifier" 
-            v-model="form.identifier" 
-            placeholder="Ej: juan.perez o juan@email.com"
+            id="username" 
+            v-model="form.username" 
+            placeholder="Ej: juan.perez"
             required
           >
         </div>
@@ -52,7 +52,7 @@ export default {
   setup() {
     const router = useRouter()
     const form = ref({
-      identifier: '',
+      username: '',
       password: ''
     })
     const error = ref('')
@@ -63,15 +63,15 @@ export default {
         const savedUsers = localStorage.getItem('redyon_users')
         const users = savedUsers ? JSON.parse(savedUsers) : []
         
-        // Buscar usuario por username O email
+        // Buscar usuario solo por username (ELIMINADO email)
         const user = users.find(u => 
-          (u.username === form.value.identifier || u.email === form.value.identifier) && 
+          u.username === form.value.username && 
           u.password === form.value.password &&
           u.activo === true
         )
         
         if (!user) {
-          error.value = 'Usuario/Correo o contraseña incorrectos'
+          error.value = 'Usuario o contraseña incorrectos'
           return
         }
         
@@ -88,15 +88,17 @@ export default {
           }
         }
         
-        // Guardar en localStorage
+        // Guardar en localStorage (ELIMINADO email)
         localStorage.setItem('isAuthenticated', 'true')
         localStorage.setItem('userRole', user.role)
         localStorage.setItem('currentUser', JSON.stringify({
           username: user.username,
-          email: user.email || '',
           id: user.id,
           permissions: user.permissions || {}
         }))
+        
+        // Guardar username por separado para fácil acceso
+        localStorage.setItem('currentUsername', user.username)
         
         // Redirigir al dashboard
         router.push('/dashboard')
