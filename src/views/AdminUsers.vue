@@ -4,405 +4,413 @@
     <AppSidebar :isOpen="sidebarOpen" />
     
     <main :class="['main-content', { 'sidebar-open': sidebarOpen }]">
-      <div class="page-header">
-        <h1>Administración de Usuarios</h1>
-        <p>Gestión de permisos y acceso al sistema</p>
-      </div>
-
-      <!-- Estadísticas -->
-      <div class="admin-stats">
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #1f998f20;">
-            <span>👤</span>
-          </div>
-          <div class="stat-content">
-            <h4>Total Usuarios</h4>
-            <p class="stat-value">{{ totalUsers }}</p>
-          </div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #27ae6020;">
-            <span>✅</span>
-          </div>
-          <div class="stat-content">
-            <h4>Activos</h4>
-            <p class="stat-value">{{ activeUsers }}</p>
-          </div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #3498db20;">
-            <span>👑</span>
-          </div>
-          <div class="stat-content">
-            <h4>Administradores</h4>
-            <p class="stat-value">{{ adminUsers }}</p>
-          </div>
-        </div>
-        
-        <div class="stat-card">
-          <div class="stat-icon" style="background: #9b59b620;">
-            <span>🗂️</span>
-          </div>
-          <div class="stat-content">
-            <h4>Operadores</h4>
-            <p class="stat-value">{{ operatorUsers }}</p>
-          </div>
+      <!-- Mensaje de acceso denegado para no administradores -->
+      <div v-if="!esAdministrador" class="access-denied">
+        <div class="denied-card">
+          <span class="denied-icon">🔒</span>
+          <h2>Acceso Restringido</h2>
+          <p>Solo los administradores pueden gestionar usuarios.</p>
+          <button @click="volverAlDashboard" class="btn-volver">
+            Volver al Dashboard
+          </button>
         </div>
       </div>
 
-      <div class="admin-content">
-        <!-- Formulario para nuevo usuario -->
-        <div class="form-section">
-          <div class="section-header">
-            <h3>Crear Nuevo Usuario</h3>
-            <button v-if="editingUser" @click="cancelEdit" class="btn-cancel">
-              ❌ Cancelar Edición
-            </button>
+      <template v-else>
+        <div class="page-header">
+          <h1>Administración de Usuarios</h1>
+          <p>Gestión de permisos y acceso al sistema</p>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="admin-stats">
+          <div class="stat-card">
+            <div class="stat-icon" style="background: #1f998f20;">
+              <span>👤</span>
+            </div>
+            <div class="stat-content">
+              <h4>Total Usuarios</h4>
+              <p class="stat-value">{{ totalUsers }}</p>
+            </div>
           </div>
           
-          <form @submit.prevent="saveUser" class="user-form">
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Nombre de Usuario:</label>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: #27ae6020;">
+              <span>✅</span>
+            </div>
+            <div class="stat-content">
+              <h4>Activos</h4>
+              <p class="stat-value">{{ activeUsers }}</p>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon" style="background: #3498db20;">
+              <span>👑</span>
+            </div>
+            <div class="stat-content">
+              <h4>Administradores</h4>
+              <p class="stat-value">{{ adminUsers }}</p>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon" style="background: #9b59b620;">
+              <span>🗂️</span>
+            </div>
+            <div class="stat-content">
+              <h4>Operadores</h4>
+              <p class="stat-value">{{ operatorUsers }}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-content">
+          <!-- Formulario para nuevo usuario (solo visible para admins) -->
+          <div class="form-section">
+            <div class="section-header">
+              <h3>Crear Nuevo Usuario</h3>
+              <button v-if="editingUser" @click="cancelEdit" class="btn-cancel">
+                ❌ Cancelar Edición
+              </button>
+            </div>
+            
+            <form @submit.prevent="saveUser" class="user-form">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Nombre de Usuario:</label>
+                  <input 
+                    type="text" 
+                    v-model="userForm.username" 
+                    placeholder="Ej: juan.perez" 
+                    required
+                    :disabled="editingUser"
+                  >
+                </div>
+                
+                <div class="form-group">
+                  <label>Contraseña:</label>
+                  <input 
+                    type="password" 
+                    v-model="userForm.password" 
+                    :placeholder="editingUser ? 'Dejar en blanco para no cambiar' : 'Usa caracteres variados'"
+                    :required="!editingUser"
+                  >
+                  <small class="password-hint">
+                    {{ editingUser ? 'Solo llenar para cambiar contraseña' : 'Requerida para nuevo usuario' }}
+                  </small>
+                </div>
+                
+                <div class="form-group">
+                  <label>Rol:</label>
+                  <select v-model="userForm.role" @change="onRoleChange" required>
+                    <option value="operador">Operador</option>
+                    <option value="administrador">Administrador</option>
+                  </select>
+                  <small class="role-hint">
+                    {{
+                      userForm.role === 'administrador' ? 'Acceso total al sistema' :
+                      'Solo lectura y creación básica'
+                    }}
+                  </small>
+                </div>
+                
+                <div class="form-group">
+                  <label>Estado:</label>
+                  <div class="status-toggle">
+                    <label class="toggle-label">
+                      <input type="checkbox" v-model="userForm.activo">
+                      <span class="toggle-slider"></span>
+                      <span class="toggle-text">
+                        {{ userForm.activo ? 'Activo' : 'Inactivo' }}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label>Fecha de Expiración:</label>
+                  <input 
+                    type="date"
+                    v-model="userForm.fechaExpiracion"
+                    :min="getCurrentDateMexico()"
+                  >
+                  <small class="date-hint">
+                    {{ userForm.fechaExpiracion ? 'Expira: ' + formatDateMexico(userForm.fechaExpiracion) : 'Sin fecha de expiración' }}
+                  </small>
+                </div>
+              </div>
+
+              <!-- PERMISOS ESPECÍFICOS PARA TABLES -->
+              <div class="permissions-section">
+                <h4>Permisos en Página Tables</h4>
+                <div class="permissions-grid">
+                  <div class="permission-category">
+                    <h5>Formulario de Registros</h5>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.crearRegistros">
+                        <span>Crear nuevos registros</span>
+                      </label>
+                      <small>Agregar registros en formulario</small>
+                    </div>
+                  </div>
+                  
+                  <div class="permission-category">
+                    <h5>Visualización</h5>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.soloVer">
+                        <span>Solo Ver registros</span>
+                      </label>
+                      <small>No puede crear, editar ni eliminar</small>
+                    </div>
+                  </div>
+                  
+                  <div class="permission-category">
+                    <h5>Comentarios</h5>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.editarComentarios">
+                        <span>Editar Comentarios</span>
+                      </label>
+                      <small>Permite editar comentarios en registros</small>
+                    </div>
+                  </div>
+                  
+                  <div class="permission-category">
+                    <h5>Impresión</h5>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.imprimir">
+                        <span>Imprimir registros</span>
+                      </label>
+                      <small>Permite imprimir comprobantes</small>
+                    </div>
+                  </div>
+                  
+                  <div class="permission-category">
+                    <h5>Widgets de Caja</h5>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.modificarCajaInicial">
+                        <span>Modificar Caja Inicial</span>
+                      </label>
+                      <small>Editar presupuesto inicial</small>
+                    </div>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.modificarDineroInicial">
+                        <span>Modificar Dinero Inicial</span>
+                      </label>
+                      <small>Editar dinero disponible</small>
+                    </div>
+                  </div>
+                  
+                  <div class="permission-category">
+                    <h5>Exportación de Datos</h5>
+                    <div class="permission-item">
+                      <label>
+                        <input type="checkbox" v-model="userForm.permissions.exportarDatos">
+                        <span>Exportar datos</span>
+                      </label>
+                      <small>Exportar registros a Excel/CSV</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="btn-secondary" @click="resetForm">
+                  Limpiar
+                </button>
+                <button type="submit" class="btn-primary">
+                  {{ editingUser ? '💾 Actualizar Usuario' : 'Crear Usuario' }}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Lista de usuarios -->
+          <div class="users-section">
+            <div class="section-header">
+              <h3>Lista de Usuarios</h3>
+              <div class="search-box">
                 <input 
                   type="text" 
-                  v-model="userForm.username" 
-                  placeholder="Ej: juan.perez" 
-                  required
-                  :disabled="editingUser"
+                  v-model="searchQuery" 
+                  placeholder="Buscar usuario..."
+                  class="search-input"
                 >
-              </div>
-              
-              <div class="form-group">
-                <label>Contraseña:</label>
-                <input 
-                  type="password" 
-                  v-model="userForm.password" 
-                  :placeholder="editingUser ? 'Dejar en blanco para no cambiar' : 'Usa caracteres variados'"
-                  :required="!editingUser"
-                >
-                <small class="password-hint">
-                  {{ editingUser ? 'Solo llenar para cambiar contraseña' : 'Requerida para nuevo usuario' }}
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label>Rol:</label>
-                <select v-model="userForm.role" @change="onRoleChange" required>
-                  <option value="operador">Operador</option>
-                  <option value="administrador">Administrador</option>
-                </select>
-                <small class="role-hint">
-                  {{
-                    userForm.role === 'administrador' ? 'Acceso total al sistema' :
-                    'Solo lectura y creación básica'
-                  }}
-                </small>
-              </div>
-              
-              <div class="form-group">
-                <label>Estado:</label>
-                <div class="status-toggle">
-                  <label class="toggle-label">
-                    <input type="checkbox" v-model="userForm.activo">
-                    <span class="toggle-slider"></span>
-                    <span class="toggle-text">
-                      {{ userForm.activo ? 'Activo' : 'Inactivo' }}
-                    </span>
-                  </label>
-                </div>
-              </div>
-              
-              <div class="form-group">
-                <label>Fecha de Expiración:</label>
-                <input 
-                  type="date"
-                  v-model="userForm.fechaExpiracion"
-                  :min="getCurrentDateMexico()"
-                >
-                <small class="date-hint">
-                  {{ userForm.fechaExpiracion ? 'Expira: ' + formatDateMexico(userForm.fechaExpiracion) : 'Sin fecha de expiración' }}
-                </small>
+                <span class="search-icon">🔍</span>
               </div>
             </div>
 
-            <!-- PERMISOS ESPECÍFICOS PARA TABLES -->
-            <div class="permissions-section">
-              <h4>Permisos en Página Tables</h4>
-              <div class="permissions-grid">
-                <!-- Permisos de formulario -->
-                <div class="permission-category">
-                  <h5>Formulario de Registros</h5>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.crearRegistros">
-                      <span>Crear nuevos registros</span>
-                    </label>
-                    <small>Agregar registros en formulario</small>
-                  </div>
-                </div>
-                
-                <!-- Permisos de solo ver -->
-                <div class="permission-category">
-                  <h5>Visualización</h5>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.soloVer">
-                      <span>Solo Ver registros</span>
-                    </label>
-                    <small>No puede crear, editar ni eliminar</small>
-                  </div>
-                </div>
-                
-                <!-- Permiso de editar comentarios -->
-                <div class="permission-category">
-                  <h5>Comentarios</h5>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.editarComentarios">
-                      <span>Editar Comentarios</span>
-                    </label>
-                    <small>Permite editar comentarios en registros</small>
-                  </div>
-                </div>
-                
-                <!-- Permiso de imprimir -->
-                <div class="permission-category">
-                  <h5>Impresión</h5>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.imprimir">
-                      <span>Imprimir registros</span>
-                    </label>
-                    <small>Permite imprimir comprobantes</small>
-                  </div>
-                </div>
-                
-                <!-- Permisos de widgets -->
-                <div class="permission-category">
-                  <h5>Widgets de Caja</h5>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.modificarCajaInicial">
-                      <span>Modificar Caja Inicial</span>
-                    </label>
-                    <small>Editar presupuesto inicial</small>
-                  </div>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.modificarDineroInicial">
-                      <span>Modificar Dinero Inicial</span>
-                    </label>
-                    <small>Editar dinero disponible</small>
-                  </div>
-                </div>
-                
-                <!-- Permiso de exportación -->
-                <div class="permission-category">
-                  <h5>Exportación de Datos</h5>
-                  <div class="permission-item">
-                    <label>
-                      <input type="checkbox" v-model="userForm.permissions.exportarDatos">
-                      <span>Exportar datos</span>
-                    </label>
-                    <small>Exportar registros a Excel/CSV</small>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Botones de acción -->
-            <div class="form-actions">
-              <button type="button" class="btn-secondary" @click="resetForm">
-                Limpiar
-              </button>
-              <button type="submit" class="btn-primary">
-                {{ editingUser ? '💾 Actualizar Usuario' : 'Crear Usuario' }}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- Lista de usuarios -->
-        <div class="users-section">
-          <div class="section-header">
-            <h3>Lista de Usuarios</h3>
-            <div class="search-box">
-              <input 
-                type="text" 
-                v-model="searchQuery" 
-                placeholder="Buscar usuario..."
-                class="search-input"
-              >
-              <span class="search-icon">🔍</span>
-            </div>
-          </div>
-
-          <div class="users-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Usuario</th>
-                  <th>Rol</th>
-                  <th>Estado</th>
-                  <th>Permisos Tables</th>
-                  <th>Expiración</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="user in filteredUsers" :key="user.id">
-                  <td>
-                    <div class="user-info">
-                      <span class="username">{{ user.username }}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <span :class="['role-tag', user.role]">
-                      {{ getRoleName(user.role) }}
-                    </span>
-                  </td>
-                  <td>
-                    <span :class="['status-badge', user.activo ? 'active' : 'inactive']">
-                      {{ user.activo ? '✅ Activo' : '❌ Inactivo' }}
-                    </span>
-                  </td>
-                  <td>
-                    <div class="permissions-summary">
-                      <span class="permission-count">
-                        {{ countActivePermissions(user.permissions) }} / 7
+            <div class="users-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Permisos Tables</th>
+                    <th>Expiración</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="user in filteredUsers" :key="user.id">
+                    <td>
+                      <div class="user-info">
+                        <span class="username">{{ user.username }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span :class="['role-tag', user.role]">
+                        {{ getRoleName(user.role) }}
                       </span>
-                      <button 
-                        @click="viewPermissions(user)" 
-                        class="btn-view-permissions"
-                        title="Ver permisos detallados"
-                      >
-                        👁️
-                      </button>
-                    </div>
-                  </td>
-                  <td>
-                    <span :class="['expiration', isExpiredMexico(user) ? 'expired' : 'valid']">
-                      {{ user.fechaExpiracion ? formatDateMexico(user.fechaExpiracion) : 'Sin expiración' }}
-                      <small v-if="isExpiredMexico(user)" class="expired-label">(Expirado)</small>
-                    </span>
-                  </td>
-                  <td class="actions-cell">
-                    <div class="action-buttons">
-                      <button @click="editUser(user)" class="btn-edit" title="Editar">
-                        ✏️
-                      </button>
-                      <button 
-                        @click="toggleUserStatus(user)" 
-                        :class="['btn-toggle', user.activo ? 'deactivate' : 'activate']"
-                        :title="user.activo ? 'Desactivar' : 'Activar'"
-                      >
-                        {{ user.activo ? '⏸️' : '▶️' }}
-                      </button>
-                      <button 
-                        v-if="user.role !== 'administrador'" 
-                        @click="deleteUser(user.id)" 
-                        class="btn-delete"
-                        title="Eliminar"
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr v-if="filteredUsers.length === 0">
-                  <td colspan="6" class="no-users">
-                    No se encontraron usuarios
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modal de permisos (actualizado) -->
-      <div v-if="showPermissionsModal" class="modal-overlay" @click="closeModal">
-        <div class="modal-content" @click.stop>
-          <div class="modal-header">
-            <h3>🔐 Permisos de {{ selectedUser?.username }}</h3>
-            <button @click="closeModal" class="modal-close">×</button>
-          </div>
-          <div class="modal-body">
-            <div class="permissions-detail">
-              <div class="permission-group">
-                <h4>Formulario:</h4>
-                <ul>
-                  <li :class="selectedUser?.permissions.crearRegistros ? 'allowed' : 'denied'">
-                    Crear registros: {{ selectedUser?.permissions.crearRegistros ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                </ul>
-              </div>
-              
-              <div class="permission-group">
-                <h4>Visualización:</h4>
-                <ul>
-                  <li :class="selectedUser?.permissions.soloVer ? 'allowed' : 'denied'">
-                    Solo Ver: {{ selectedUser?.permissions.soloVer ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                </ul>
-              </div>
-              
-              <div class="permission-group">
-                <h4>Comentarios:</h4>
-                <ul>
-                  <li :class="selectedUser?.permissions.editarComentarios ? 'allowed' : 'denied'">
-                    Editar Comentarios: {{ selectedUser?.permissions.editarComentarios ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                </ul>
-              </div>
-              
-              <div class="permission-group">
-                <h4>Impresión:</h4>
-                <ul>
-                  <li :class="selectedUser?.permissions.imprimir ? 'allowed' : 'denied'">
-                    Imprimir: {{ selectedUser?.permissions.imprimir ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                </ul>
-              </div>
-              
-              <div class="permission-group">
-                <h4>Caja:</h4>
-                <ul>
-                  <li :class="selectedUser?.permissions.modificarCajaInicial ? 'allowed' : 'denied'">
-                    Modificar Caja Inicial: {{ selectedUser?.permissions.modificarCajaInicial ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                  <li :class="selectedUser?.permissions.modificarDineroInicial ? 'allowed' : 'denied'">
-                    Modificar Dinero Inicial: {{ selectedUser?.permissions.modificarDineroInicial ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                </ul>
-              </div>
-              
-              <div class="permission-group">
-                <h4>Exportación:</h4>
-                <ul>
-                  <li :class="selectedUser?.permissions.exportarDatos ? 'allowed' : 'denied'">
-                    Exportar datos: {{ selectedUser?.permissions.exportarDatos ? '✅ Permitido' : '❌ Denegado' }}
-                  </li>
-                </ul>
-              </div>
+                    </td>
+                    <td>
+                      <span :class="['status-badge', user.activo ? 'active' : 'inactive']">
+                        {{ user.activo ? '✅ Activo' : '❌ Inactivo' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="permissions-summary">
+                        <span class="permission-count">
+                          {{ countActivePermissions(user.permissions) }} / 7
+                        </span>
+                        <button 
+                          @click="viewPermissions(user)" 
+                          class="btn-view-permissions"
+                          title="Ver permisos detallados"
+                        >
+                          👁️
+                        </button>
+                      </div>
+                    </td>
+                    <td>
+                      <span :class="['expiration', isExpiredMexico(user) ? 'expired' : 'valid']">
+                        {{ user.fechaExpiracion ? formatDateMexico(user.fechaExpiracion) : 'Sin expiración' }}
+                        <small v-if="isExpiredMexico(user)" class="expired-label">(Expirado)</small>
+                      </span>
+                    </td>
+                    <td class="actions-cell">
+                      <div class="action-buttons">
+                        <button @click="editUser(user)" class="btn-edit" title="Editar">
+                          ✏️
+                        </button>
+                        <button 
+                          @click="toggleUserStatus(user)" 
+                          :class="['btn-toggle', user.activo ? 'deactivate' : 'activate']"
+                          :title="user.activo ? 'Desactivar' : 'Activar'"
+                        >
+                          {{ user.activo ? '⏸️' : '▶️' }}
+                        </button>
+                        <button 
+                          v-if="user.role !== 'administrador'" 
+                          @click="deleteUser(user.id)" 
+                          class="btn-delete"
+                          title="Eliminar"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-if="filteredUsers.length === 0">
+                    <td colspan="6" class="no-users">
+                      No se encontraron usuarios
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-          <div class="modal-footer">
-            <button @click="closeModal" class="btn-close-modal">
-              Cerrar
-            </button>
+        </div>
+
+        <!-- Modal de permisos -->
+        <div v-if="showPermissionsModal" class="modal-overlay" @click="closeModal">
+          <div class="modal-content" @click.stop>
+            <div class="modal-header">
+              <h3>Permisos de {{ selectedUser?.username }}</h3>
+              <button @click="closeModal" class="modal-close">×</button>
+            </div>
+            <div class="modal-body">
+              <div class="permissions-detail">
+                <div class="permission-group">
+                  <h4>Formulario:</h4>
+                  <ul>
+                    <li :class="selectedUser?.permissions.crearRegistros ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.crearRegistros ? '✅' : '❌' }} Crear registros
+                    </li>
+                  </ul>
+                </div>
+                
+                <div class="permission-group">
+                  <h4>Visualización:</h4>
+                  <ul>
+                    <li :class="selectedUser?.permissions.soloVer ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.soloVer ? '✅' : '❌' }} Solo Ver
+                    </li>
+                  </ul>
+                </div>
+                
+                <div class="permission-group">
+                  <h4>Comentarios:</h4>
+                  <ul>
+                    <li :class="selectedUser?.permissions.editarComentarios ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.editarComentarios ? '✅' : '❌' }} Editar Comentarios
+                    </li>
+                  </ul>
+                </div>
+                
+                <div class="permission-group">
+                  <h4>Impresión:</h4>
+                  <ul>
+                    <li :class="selectedUser?.permissions.imprimir ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.imprimir ? '✅' : '❌' }} Imprimir
+                    </li>
+                  </ul>
+                </div>
+                
+                <div class="permission-group">
+                  <h4>Caja:</h4>
+                  <ul>
+                    <li :class="selectedUser?.permissions.modificarCajaInicial ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.modificarCajaInicial ? '✅' : '❌' }} Modificar Caja Inicial
+                    </li>
+                    <li :class="selectedUser?.permissions.modificarDineroInicial ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.modificarDineroInicial ? '✅' : '❌' }} Modificar Dinero Inicial
+                    </li>
+                  </ul>
+                </div>
+                
+                <div class="permission-group">
+                  <h4>Exportación:</h4>
+                  <ul>
+                    <li :class="selectedUser?.permissions.exportarDatos ? 'allowed' : 'denied'">
+                      {{ selectedUser?.permissions.exportarDatos ? '✅' : '❌' }} Exportar datos
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button @click="closeModal" class="btn-close-modal">
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
     </main>
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import AppHeader from '@/components/Layout/Header.vue'
 import AppSidebar from '@/components/Layout/Sidebar.vue'
 
@@ -413,13 +421,20 @@ export default {
     AppSidebar
   },
   setup() {
+    const router = useRouter()
     const sidebarOpen = ref(false)
     const searchQuery = ref('')
     const editingUser = ref(null)
     const showPermissionsModal = ref(false)
     const selectedUser = ref(null)
+    const currentUserRole = ref('')
 
-    // Formulario de usuario con nuevo permiso de imprimir
+    // Verificar si el usuario actual es administrador
+    const esAdministrador = computed(() => {
+      return currentUserRole.value === 'administrador'
+    })
+
+    // Formulario de usuario
     const userForm = ref({
       username: '',
       password: '',
@@ -427,10 +442,10 @@ export default {
       activo: true,
       fechaExpiracion: '',
       permissions: {
-        crearRegistros: true,
+        crearRegistros: false,
         soloVer: false,
         editarComentarios: false,
-        imprimir: true,
+        imprimir: false,
         modificarCajaInicial: false,
         modificarDineroInicial: false,
         exportarDatos: false
@@ -440,10 +455,20 @@ export default {
     // Lista de usuarios
     const users = ref([])
 
-    // Cargar usuarios al iniciar
+    // Cargar datos al iniciar
     onMounted(() => {
+      cargarUsuarioActual()
       loadUsers()
     })
+
+    const cargarUsuarioActual = () => {
+      const userRole = localStorage.getItem('userRole')
+      currentUserRole.value = userRole || 'operador'
+    }
+
+    const volverAlDashboard = () => {
+      router.push('/dashboard')
+    }
 
     // Funciones para horario México
     const getCurrentDateMexico = () => {
@@ -501,13 +526,26 @@ export default {
       return expDate < hoyMexico
     }
 
-    // Cargar usuarios
+    // Cargar usuarios (con limpieza de permisos antiguos)
     const loadUsers = () => {
       const savedUsers = localStorage.getItem('redyon_users')
       if (savedUsers) {
-        users.value = JSON.parse(savedUsers)
+        const parsedUsers = JSON.parse(savedUsers)
+        // Limpiar permisos antiguos y asegurar solo los 7 actuales
+        users.value = parsedUsers.map(user => ({
+          ...user,
+          permissions: {
+            crearRegistros: user.permissions?.crearRegistros || false,
+            soloVer: user.permissions?.soloVer || false,
+            editarComentarios: user.permissions?.editarComentarios || false,
+            imprimir: user.permissions?.imprimir || false,
+            modificarCajaInicial: user.permissions?.modificarCajaInicial || false,
+            modificarDineroInicial: user.permissions?.modificarDineroInicial || false,
+            exportarDatos: user.permissions?.exportarDatos || false
+          }
+        }))
       } else {
-        // Usuarios por defecto con nuevo permiso de imprimir
+        // Usuarios por defecto
         const defaultUsers = [
           {
             id: 1,
@@ -604,6 +642,11 @@ export default {
 
     // Guardar usuario
     const saveUser = () => {
+      if (!esAdministrador.value) {
+        alert('❌ No tienes permiso para crear/modificar usuarios')
+        return
+      }
+
       if (!userForm.value.username.trim()) {
         alert('El nombre de usuario es requerido')
         return
@@ -614,7 +657,6 @@ export default {
         return
       }
 
-      // Verificar si el usuario ya existe
       const userExists = users.value.some(u => 
         u.username === userForm.value.username && 
         (!editingUser.value || u.id !== editingUser.value.id)
@@ -658,6 +700,10 @@ export default {
     }
 
     const editUser = (user) => {
+      if (!esAdministrador.value) {
+        alert('❌ No tienes permiso para editar usuarios')
+        return
+      }
       editingUser.value = user
       userForm.value = {
         username: user.username,
@@ -697,6 +743,10 @@ export default {
     }
 
     const toggleUserStatus = (user) => {
+      if (!esAdministrador.value) {
+        alert('❌ No tienes permiso para cambiar el estado de usuarios')
+        return
+      }
       if (user.username === 'admin') {
         alert('No se puede desactivar el usuario administrador principal')
         return
@@ -708,6 +758,10 @@ export default {
     }
 
     const deleteUser = (id) => {
+      if (!esAdministrador.value) {
+        alert('❌ No tienes permiso para eliminar usuarios')
+        return
+      }
       const user = users.value.find(u => u.id === id)
       if (!user) return
       
@@ -734,7 +788,17 @@ export default {
     }
 
     const countActivePermissions = (permissions) => {
-      return Object.values(permissions).filter(p => p).length
+      if (!permissions) return 0
+      const soloLosSiete = [
+        permissions.crearRegistros,
+        permissions.soloVer,
+        permissions.editarComentarios,
+        permissions.imprimir,
+        permissions.modificarCajaInicial,
+        permissions.modificarDineroInicial,
+        permissions.exportarDatos
+      ]
+      return soloLosSiete.filter(p => p === true).length
     }
 
     const getRoleName = (role) => {
@@ -758,6 +822,7 @@ export default {
       adminUsers,
       operatorUsers,
       filteredUsers,
+      esAdministrador,
       toggleSidebar,
       onRoleChange,
       saveUser,
@@ -772,13 +837,64 @@ export default {
       isExpiredMexico,
       formatDateMexico,
       getCurrentDateMexico,
-      getRoleName
+      getRoleName,
+      volverAlDashboard
     }
   }
 }
 </script>
 
 <style scoped>
+/* Tus estilos existentes más: */
+
+.access-denied {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+.denied-card {
+  background: white;
+  border-radius: 12px;
+  padding: 40px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  max-width: 400px;
+}
+
+.denied-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.denied-card h2 {
+  color: #e74c3c;
+  margin-bottom: 10px;
+}
+
+.denied-card p {
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.btn-volver {
+  background: #1f998f;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-volver:hover {
+  background: #18857c;
+  transform: translateY(-2px);
+}
+
 .admin-page {
   min-height: 100vh;
   background: #f8f9fa;
