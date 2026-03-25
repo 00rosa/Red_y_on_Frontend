@@ -1,3 +1,4 @@
+// src/api/index.js
 import axios from 'axios'
 
 const api = axios.create({
@@ -8,7 +9,7 @@ const api = axios.create({
   }
 })
 
-// Interceptor para agregar token
+// Interceptor para agregar token (si lo implementas después)
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token')
   if (token) {
@@ -22,8 +23,7 @@ export const login = async (identifier, password) => {
   try {
     const response = await api.post('/auth/login', { identifier, password })
     
-    // El backend NO devuelve token (según AuthController en RedApi.txt)
-    // Solo devuelve: id, username, role, activo, permissions
+    // El backend NO devuelve token, solo datos del usuario
     if (response.data) {
       localStorage.setItem('userRole', response.data.role)
       localStorage.setItem('currentUsername', response.data.username)
@@ -31,7 +31,7 @@ export const login = async (identifier, password) => {
         id: response.data.id,
         username: response.data.username,
         role: response.data.role,
-        permissions: response.data.permissions
+        permissions: response.data.permissions || {}
       }))
       localStorage.setItem('isAuthenticated', 'true')
     }
@@ -73,7 +73,6 @@ export const getRecordById = async (id) => {
   }
 }
 
-// CORREGIDO: Ahora solo actualiza comentarios (como espera el backend)
 export const updateRecordComment = async (id, usuarioId, comentario) => {
   try {
     const response = await api.put(`/registros/${id}`, { usuarioId, comentario })
@@ -82,9 +81,6 @@ export const updateRecordComment = async (id, usuarioId, comentario) => {
     throw error.response?.data || error
   }
 }
-
-// ⚠️ ELIMINADO: updateRecord (no se usa, se reemplaza por updateRecordComment)
-// ⚠️ ELIMINADO: filterRecords (se usa getRecords con parámetros)
 
 // ============ CATÁLOGOS ============
 export const getConceptos = async () => {
@@ -154,7 +150,17 @@ export const toggleUserStatus = async (id, activo) => {
 }
 
 // ============ GRÁFICAS ============
-// 🔥 CORREGIDO: Ahora usa GET con parámetros (como espera el backend)
+export const getDashboardData = async (usuarioId, periodo = 'week') => {
+  try {
+    const response = await api.get('/graficas/dashboard', { 
+      params: { usuarioId, periodo } 
+    })
+    return response.data
+  } catch (error) {
+    throw error.response?.data || error
+  }
+}
+
 export const getChartData = async (usuarioId, periodo = 'week') => {
   try {
     const response = await api.get(`/graficas/${periodo}`, { 
@@ -166,12 +172,28 @@ export const getChartData = async (usuarioId, periodo = 'week') => {
   }
 }
 
-// Alternativa: usar el endpoint dashboard
-export const getDashboardData = async (usuarioId, periodo = 'week') => {
+// ============ CAJA (si lo implementas después) ============
+export const getCajaData = async (usuarioId) => {
   try {
-    const response = await api.get('/graficas/dashboard', { 
-      params: { usuarioId, periodo } 
-    })
+    const response = await api.get(`/caja/${usuarioId}`)
+    return response.data
+  } catch (error) {
+    throw error.response?.data || error
+  }
+}
+
+export const updateCajaInicial = async (usuarioId, nuevoValor) => {
+  try {
+    const response = await api.put('/caja/inicial', { usuarioId, nuevoValor })
+    return response.data
+  } catch (error) {
+    throw error.response?.data || error
+  }
+}
+
+export const updateDineroInicial = async (usuarioId, nuevoValor) => {
+  try {
+    const response = await api.put('/caja/dinero', { usuarioId, nuevoValor })
     return response.data
   } catch (error) {
     throw error.response?.data || error

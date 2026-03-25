@@ -15,6 +15,7 @@
             id="username" 
             v-model="form.username" 
             placeholder="Ej: juan.perez"
+            :disabled="loading"
             required
           >
         </div>
@@ -26,12 +27,14 @@
             id="password" 
             v-model="form.password" 
             placeholder="Ingrese su contraseña"
+            :disabled="loading"
             required
           >
         </div>
 
-        <button type="submit" class="btn-continuar">
-          Iniciar Sesión
+        <button type="submit" class="btn-continuar" :disabled="loading">
+          <span v-if="!loading">Iniciar Sesión</span>
+          <span v-else>Iniciando sesión...</span>
         </button>
       </form>
 
@@ -46,6 +49,7 @@
 <script>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { login } from '@/api' 
 
 export default {
   name: 'LoginView',
@@ -56,28 +60,33 @@ export default {
       password: ''
     })
     const error = ref('')
+    const loading = ref(false)
 
     const handleLogin = async () => {
+      // Validar campos
+      if (!form.value.username.trim() || !form.value.password.trim()) {
+        error.value = 'Por favor complete todos los campos'
+        return
+      }
+
+      loading.value = true
+      error.value = ''
+      
       try {
-        // Cargar usuarios desde localStorage
-        const savedUsers = localStorage.getItem('redyon_users')
-        const users = savedUsers ? JSON.parse(savedUsers) : []
+        const response = await login(form.value.username, form.value.password)
         
-        // Buscar usuario solo por username (ELIMINADO email)
-        const user = users.find(u => 
-          u.username === form.value.username && 
-          u.password === form.value.password &&
-          u.activo === true
-        )
+        // La respuesta del backend contiene:
+        // { id, username, role, activo, permissions }
         
-        if (!user) {
-          error.value = 'Usuario o contraseña incorrectos'
+        // Verificar si el usuario está activo (el backend ya lo hace, pero por si acaso)
+        if (!response.activo) {
+          error.value = 'Usuario inactivo'
           return
         }
         
-        // Verificar si el usuario ha expirado
-        if (user.fechaExpiracion) {
-          const expDate = new Date(user.fechaExpiracion)
+        // Verificar expiración (el backend ya lo hace, pero por si acaso)
+        if (response.fechaExpiracion) {
+          const expDate = new Date(response.fechaExpiracion)
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           expDate.setHours(0, 0, 0, 0)
@@ -88,28 +97,37 @@ export default {
           }
         }
         
-        // Guardar en localStorage (ELIMINADO email)
+        // Guardar datos de sesión en localStorage
         localStorage.setItem('isAuthenticated', 'true')
-        localStorage.setItem('userRole', user.role)
+        localStorage.setItem('userRole', response.role)
+        localStorage.setItem('currentUsername', response.username)
         localStorage.setItem('currentUser', JSON.stringify({
-          username: user.username,
-          id: user.id,
-          permissions: user.permissions || {}
+          id: response.id,
+          username: response.username,
+          role: response.role,
+          permissions: response.permissions || {}
         }))
         
-        // Guardar username por separado para fácil acceso
-        localStorage.setItem('currentUsername', user.username)
+        // Opcional: Guardar token si el backend lo implementara en el futuro
+        // if (response.token) {
+        //   localStorage.setItem('token', response.token)
+        // }
         
         // Redirigir al dashboard
         router.push('/dashboard')
       } catch (err) {
-        error.value = 'Error en el login. Verifique sus credenciales.'
+        // Mostrar mensaje de error de la API
+        error.value = err.mensaje || 'Usuario o contraseña incorrectos'
+        console.error('Error de login:', err)
+      } finally {
+        loading.value = false
       }
     }
 
     return {
       form,
       error,
+      loading,
       handleLogin
     }
   }
@@ -117,7 +135,6 @@ export default {
 </script>
 
 <style scoped>
-/* Los estilos se mantienen igual */
 .login-container {
   display: flex;
   justify-content: center;
@@ -178,6 +195,11 @@ export default {
   border-color: #21a398;
 }
 
+.input-group input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
 .btn-continuar {
   background: linear-gradient(135deg, #1f998f 0%, #21a398 100%);
   color: white;
@@ -191,13 +213,18 @@ export default {
   margin-top: 10px;
 }
 
-.btn-continuar:hover {
+.btn-continuar:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(31, 153, 143, 0.3);
 }
 
-.btn-continuar:active {
+.btn-continuar:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.btn-continuar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .error-message {

@@ -10,28 +10,6 @@
       </div>
 
       <!-- Widgets rápidos -->
-      <!-- <div class="widgets-grid">
-        <div class="widget">
-          <div class="widget-icon" style="background: #1f998f20;">
-            <span>📊</span>
-          </div>
-          <div class="widget-content">
-            <h3>Registros Hoy</h3>
-            <p class="widget-value">24</p>
-          </div>
-        </div>
-
-        <div class="widget">
-          <div class="widget-icon" style="background: #21a39820;">
-            <span>💰</span>
-          </div>
-          <div class="widget-content">
-            <h3>Total Hoy</h3>
-            <p class="widget-value">$12,450</p>
-          </div>
-        </div>
-
-      </div> -->
 
       <!-- Acciones rápidas -->
       <div class="quick-actions">

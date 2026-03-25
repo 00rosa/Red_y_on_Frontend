@@ -7,6 +7,9 @@
       <div class="page-header">
         <h1>Gráficas de REDYON</h1>
         <p>Visualización de datos por periodo</p>
+        <div v-if="loading" class="loading-notice">
+          ⏳ Cargando datos...
+        </div>
       </div>
 
       <!-- Filtros y controles -->
@@ -18,6 +21,7 @@
               :key="period.value"
               :class="['period-btn', { active: activePeriod === period.value }]"
               @click="setPeriod(period.value)"
+              :disabled="loading"
             >
               {{ period.label }}
             </button>
@@ -26,13 +30,13 @@
           <div class="date-range" v-if="activePeriod === 'custom'">
             <div class="date-input">
               <label>Desde:</label>
-              <input type="date" v-model="dateRange.from">
+              <input type="date" v-model="dateRange.from" :disabled="loading">
             </div>
             <div class="date-input">
               <label>Hasta:</label>
-              <input type="date" v-model="dateRange.to">
+              <input type="date" v-model="dateRange.to" :disabled="loading">
             </div>
-            <button @click="applyCustomRange" class="btn-apply">
+            <button @click="applyCustomRange" class="btn-apply" :disabled="loading">
               Aplicar
             </button>
           </div>
@@ -45,8 +49,8 @@
             </div>
             <div class="stat-content">
               <h4>Total Periodo</h4>
-              <p class="stat-value" :class="totalPeriod >= 0 ? 'positive' : 'negative'">
-                ${{ formatCurrency(totalPeriod) }}
+              <p class="stat-value" :class="chartData?.totalPeriod >= 0 ? 'positive' : 'negative'">
+                ${{ formatCurrency(chartData?.totalPeriod || 0) }}
               </p>
             </div>
           </div>
@@ -57,7 +61,7 @@
             </div>
             <div class="stat-content">
               <h4>Ingresos</h4>
-              <p class="stat-value positive">${{ formatCurrency(totalIncome) }}</p>
+              <p class="stat-value positive">${{ formatCurrency(chartData?.totalIncome || 0) }}</p>
             </div>
           </div>
           
@@ -67,7 +71,7 @@
             </div>
             <div class="stat-content">
               <h4>Egresos</h4>
-              <p class="stat-value negative">${{ formatCurrency(Math.abs(totalExpense)) }}</p>
+              <p class="stat-value negative">${{ formatCurrency(chartData?.totalExpense || 0) }}</p>
             </div>
           </div>
           
@@ -77,7 +81,7 @@
             </div>
             <div class="stat-content">
               <h4>Registros</h4>
-              <p class="stat-value">{{ filteredRecords.length }}</p>
+              <p class="stat-value">{{ chartData?.recordCount || 0 }}</p>
             </div>
           </div>
         </div>
@@ -97,11 +101,11 @@
           <div class="chart-legend">
             <div class="legend-item">
               <span class="legend-color" style="background: #27ae60;"></span>
-              <span>Ingresos: ${{ formatCurrency(totalIncome) }}</span>
+              <span>Ingresos: ${{ formatCurrency(chartData?.totalIncome || 0) }}</span>
             </div>
             <div class="legend-item">
               <span class="legend-color" style="background: #e74c3c;"></span>
-              <span>Egresos: ${{ formatCurrency(Math.abs(totalExpense)) }}</span>
+              <span>Egresos: ${{ formatCurrency(chartData?.totalExpense || 0) }}</span>
             </div>
           </div>
         </div>
@@ -160,12 +164,12 @@
             <button 
               @click="exportToExcel" 
               class="btn-export"
-              :disabled="!canExport"
+              :disabled="!canExport || loading || !records.length"
             >
               📥 Exportar Excel
               <span v-if="!canExport" class="permission-hint">(Sin permiso)</span>
             </button>
-            <button @click="toggleFilters" class="btn-filter">
+            <button @click="toggleFilters" class="btn-filter" :disabled="loading">
               🔍 {{ showFilters ? 'Ocultar' : 'Mostrar' }} Filtros
             </button>
           </div>
@@ -175,62 +179,50 @@
           <div class="filter-row">
             <div class="filter-group">
               <label>Concepto:</label>
-              <select v-model="advancedFilters.concepto">
+              <select v-model="advancedFilters.concepto" :disabled="loading">
                 <option value="">Todos</option>
-                <option value="servicio_internet">Servicio de Internet</option>
-                <option value="gastos_operativos">Gastos Operativos</option>
-                <option value="gasto_administrativo">Gasto Administrativo</option>
-                <option value="viaticos">Viáticos</option>
-                <option value="propinas">Propinas</option>
-                <option value="dedicados_clientes">Dedicados-Clientes</option>
-                <option value="actividades">Actividades</option>
-                <option value="venta_almacen">Venta de Almacen</option>
-                <option value="recarga">Recarga</option>
-                <option value="comisiones">Comisiones</option>
-                <option value="entrega_efectivo">Entrega Efectivo</option>
-                <option value="gastos_personales">Gastos Personales</option>
-                <option value="pagos_tarjetas">Pagos a Tarjetas</option>
-                <option value="compras">Compras</option>
-                <option value="dedicados_pagos">Dedicados Pagos</option>
-                <option value="recibimiento_efectivo">Recibimiento de efectivo</option>
-                <option value="otros">Otros</option>
+                <option v-for="concepto in conceptosUnicos" :key="concepto" :value="concepto">
+                  {{ concepto }}
+                </option>
               </select>
             </div>
             
             <div class="filter-group">
               <label>Método Pago:</label>
-              <select v-model="advancedFilters.metodoPago">
+              <select v-model="advancedFilters.metodoPago" :disabled="loading">
                 <option value="">Todos</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta">Tarjeta</option>
-                <option value="terminal">Terminal</option>
-                <option value="transferencia">Transferencia</option>
+                <option v-for="metodo in metodosUnicos" :key="metodo" :value="metodo">
+                  {{ metodo }}
+                </option>
               </select>
             </div>
             
             <div class="filter-group">
               <label>Monto mínimo:</label>
-              <input type="number" v-model.number="advancedFilters.minAmount" placeholder="0">
+              <input type="number" v-model.number="advancedFilters.minAmount" placeholder="0" :disabled="loading">
             </div>
             
             <div class="filter-group">
               <label>Monto máximo:</label>
-              <input type="number" v-model.number="advancedFilters.maxAmount" placeholder="999999">
+              <input type="number" v-model.number="advancedFilters.maxAmount" placeholder="999999" :disabled="loading">
             </div>
           </div>
           
           <div class="filter-actions">
-            <button @click="applyAdvancedFilters" class="btn-apply">
+            <button @click="applyAdvancedFilters" class="btn-apply" :disabled="loading">
               🔍 Aplicar Filtros
             </button>
-            <button @click="clearFilters" class="btn-clear">
+            <button @click="clearFilters" class="btn-clear" :disabled="loading">
               🗑️ Limpiar
             </button>
           </div>
         </div>
 
         <div class="table-wrapper">
-          <table class="data-table">
+          <div v-if="loadingRecords" class="loading-indicator">
+            Cargando registros...
+          </div>
+          <table v-else class="data-table">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -247,12 +239,12 @@
                 <td>{{ formatDateMexico(record.fecha) }}</td>
                 <td>{{ record.nombre }}</td>
                 <td>
-                  <span class="concept-tag" :class="record.concepto">
-                    {{ getConceptoLabel(record.concepto) }}
+                  <span class="concept-tag" :class="getConceptoKey(record.concepto)">
+                    {{ record.concepto }}
                   </span>
                 </td>
                 <td>
-                  <span class="payment-tag">{{ getMetodoPagoLabel(record.metodoPago) }}</span>
+                  <span class="payment-tag">{{ record.metodoPago }}</span>
                 </td>
                 <td>{{ record.folio || 'N/A' }}</td>
                 <td :class="record.cantidad >= 0 ? 'positive' : 'negative'">
@@ -277,7 +269,7 @@
         <div v-if="filteredRecords.length > 0" class="pagination">
           <button 
             @click="prevPage" 
-            :disabled="currentPage === 1"
+            :disabled="currentPage === 1 || loading"
             class="page-btn"
           >
             ← Anterior
@@ -290,7 +282,7 @@
           
           <button 
             @click="nextPage" 
-            :disabled="currentPage === totalPages"
+            :disabled="currentPage === totalPages || loading"
             class="page-btn"
           >
             Siguiente →
@@ -306,6 +298,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import Chart from 'chart.js/auto'
 import AppHeader from '@/components/Layout/Header.vue'
 import AppSidebar from '@/components/Layout/Sidebar.vue'
+import { getDashboardData, getRecords } from '@/api' // IMPORTAR funciones de API
 
 export default {
   name: 'ChartsView',
@@ -316,9 +309,19 @@ export default {
   setup() {
     const sidebarOpen = ref(false)
     
-    // Permisos del usuario
-    const currentUserPermissions = ref({})
+    // Estados de carga
+    const loading = ref(false)
+    const loadingRecords = ref(false)
+    
+    // Datos del usuario
+    const currentUserId = ref(null)
     const canExport = ref(false)
+    
+    // Datos de gráficas
+    const chartData = ref(null)
+    
+    // Registros para la tabla
+    const records = ref([])
     
     // Referencias para los gráficos
     const incomeExpenseChart = ref(null)
@@ -364,10 +367,9 @@ export default {
 
     // ========== FUNCIONES PARA HORARIO MÉXICO (UTC-6) ==========
     
-    // Función para obtener fecha actual en México (UTC-6)
     const getHoyMexico = () => {
       const now = new Date()
-      const offsetMexico = -6 * 60 // UTC-6 en minutos
+      const offsetMexico = -6 * 60
       const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
       const fechaMexico = new Date(utc + (offsetMexico * 60000))
       
@@ -378,7 +380,6 @@ export default {
       return `${año}-${mes}-${dia}`
     }
 
-    // Función para convertir fecha a México
     const getFechaMexico = (fechaString) => {
       const fecha = new Date(fechaString)
       const offsetMexico = -6 * 60
@@ -386,7 +387,6 @@ export default {
       return new Date(utc + (offsetMexico * 60000))
     }
 
-    // Función para formatear fecha en formato mexicano DD/MM/YYYY
     const formatDateMexico = (dateString) => {
       if (!dateString) return ''
       
@@ -408,143 +408,79 @@ export default {
       }
     }
 
-    // ========== CARGA DE PERMISOS DE USUARIO ==========
+    // ========== CARGA DE DATOS ==========
     
-    const loadUserPermissions = () => {
-      try {
-        const savedUsers = localStorage.getItem('redyon_users')
-        const currentUsername = localStorage.getItem('currentUsername') || 'operador'
-        
-        if (savedUsers) {
-          const users = JSON.parse(savedUsers)
-          const currentUser = users.find(u => u.username === currentUsername)
-          
-          if (currentUser && currentUser.permissions) {
-            currentUserPermissions.value = currentUser.permissions
-            canExport.value = currentUser.permissions.exportarDatos === true
-          } else {
-            // Permisos por defecto
-            canExport.value = false
-          }
-        } else {
-          canExport.value = false
+    // Cargar datos del usuario
+    const loadUserData = () => {
+      const userStr = localStorage.getItem('currentUser')
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr)
+          currentUserId.value = user.id
+          canExport.value = user.permissions?.exportarDatos || false
+        } catch (e) {
+          console.error('Error parsing currentUser:', e)
         }
-      } catch (error) {
-        console.error('Error cargando permisos en charts:', error)
-        canExport.value = false
       }
     }
 
-    // ========== CARGA DE DATOS DESDE LOCALSTORAGE ==========
-    
-    // Cargar todos los registros de localStorage
-    const allRecords = computed(() => {
+    // Cargar datos de gráficas desde API
+    const loadChartData = async () => {
+      if (!currentUserId.value) return
+      
+      loading.value = true
       try {
-        const saved = localStorage.getItem('redyon_records')
-        if (!saved) return []
+        const data = await getDashboardData(currentUserId.value, activePeriod.value)
+        chartData.value = data
         
-        const records = JSON.parse(saved)
+        // También cargar registros para la tabla
+        await loadRecords()
         
-        // Ordenar por fecha (más reciente primero)
-        return records.sort((a, b) => {
-          const fechaA = getFechaMexico(a.fecha)
-          const fechaB = getFechaMexico(b.fecha)
-          return fechaB - fechaA
+        // Actualizar gráficos
+        nextTick(() => {
+          initCharts()
         })
       } catch (error) {
-        console.error('Error cargando registros:', error)
-        return []
+        console.error('Error cargando datos de gráficas:', error)
+        alert('Error al cargar datos de gráficas')
+      } finally {
+        loading.value = false
       }
+    }
+
+    // Cargar registros para la tabla
+    const loadRecords = async () => {
+      if (!currentUserId.value) return
+      
+      loadingRecords.value = true
+      try {
+        const data = await getRecords(currentUserId.value, activePeriod.value)
+        records.value = data
+      } catch (error) {
+        console.error('Error cargando registros:', error)
+      } finally {
+        loadingRecords.value = false
+      }
+    }
+
+    // ========== FILTRADO LOCAL ==========
+    
+    // Obtener conceptos únicos para filtros
+    const conceptosUnicos = computed(() => {
+      const conceptos = records.value.map(r => r.concepto)
+      return [...new Set(conceptos)]
     })
 
-    // ========== FILTRADO POR PERIODO (AJUSTADO A MÉXICO) ==========
-    
-    // Filtrar registros según periodo
+    // Obtener métodos de pago únicos para filtros
+    const metodosUnicos = computed(() => {
+      const metodos = records.value.map(r => r.metodoPago)
+      return [...new Set(metodos)]
+    })
+
+    // Filtrar registros según filtros avanzados
     const filteredRecords = computed(() => {
-      let filtered = [...allRecords.value]
+      let filtered = [...records.value]
       
-      if (filtered.length === 0) return []
-      
-      // Obtener fecha actual en México
-      const hoyMexico = getFechaMexico(getHoyMexico())
-      hoyMexico.setHours(0, 0, 0, 0)
-      
-      // Filtrar por periodo seleccionado
-      switch(activePeriod.value) {
-        case 'today': {
-          filtered = filtered.filter(r => {
-            const recordDate = getFechaMexico(r.fecha)
-            recordDate.setHours(0, 0, 0, 0)
-            return recordDate.getTime() === hoyMexico.getTime()
-          })
-          break
-        }
-          
-        case 'yesterday': {
-          const yesterday = new Date(hoyMexico)
-          yesterday.setDate(yesterday.getDate() - 1)
-          filtered = filtered.filter(r => {
-            const recordDate = getFechaMexico(r.fecha)
-            recordDate.setHours(0, 0, 0, 0)
-            return recordDate.getTime() === yesterday.getTime()
-          })
-          break
-        }
-          
-        case 'week': {
-          const weekAgo = new Date(hoyMexico)
-          weekAgo.setDate(weekAgo.getDate() - 7)
-          filtered = filtered.filter(r => {
-            const recordDate = getFechaMexico(r.fecha)
-            recordDate.setHours(0, 0, 0, 0)
-            return recordDate >= weekAgo && recordDate <= hoyMexico
-          })
-          break
-        }
-          
-        case 'month': {
-          const monthAgo = new Date(hoyMexico)
-          monthAgo.setMonth(monthAgo.getMonth() - 1)
-          filtered = filtered.filter(r => {
-            const recordDate = getFechaMexico(r.fecha)
-            recordDate.setHours(0, 0, 0, 0)
-            return recordDate >= monthAgo && recordDate <= hoyMexico
-          })
-          break
-        }
-          
-        case 'year': {
-          const yearAgo = new Date(hoyMexico)
-          yearAgo.setFullYear(yearAgo.getFullYear() - 1)
-          filtered = filtered.filter(r => {
-            const recordDate = getFechaMexico(r.fecha)
-            recordDate.setHours(0, 0, 0, 0)
-            return recordDate >= yearAgo && recordDate <= hoyMexico
-          })
-          break
-        }
-          
-        case 'custom': {
-          if (dateRange.value.from && dateRange.value.to) {
-            const fromDate = getFechaMexico(dateRange.value.from)
-            const toDate = getFechaMexico(dateRange.value.to)
-            fromDate.setHours(0, 0, 0, 0)
-            toDate.setHours(23, 59, 59, 999)
-            
-            filtered = filtered.filter(r => {
-              const recordDate = getFechaMexico(r.fecha)
-              return recordDate >= fromDate && recordDate <= toDate
-            })
-          }
-          break
-        }
-          
-        case 'all':
-          // No filtrar por fecha
-          break
-      }
-      
-      // Aplicar filtros avanzados
       if (advancedFilters.value.concepto) {
         filtered = filtered.filter(r => r.concepto === advancedFilters.value.concepto)
       }
@@ -561,125 +497,7 @@ export default {
         filtered = filtered.filter(r => Math.abs(r.cantidad) <= advancedFilters.value.maxAmount)
       }
       
-      // Ordenar por fecha (más reciente primero)
-      return filtered.sort((a, b) => {
-        const fechaA = getFechaMexico(a.fecha)
-        const fechaB = getFechaMexico(b.fecha)
-        return fechaB - fechaA
-      })
-    })
-
-    // ========== CÁLCULOS DE ESTADÍSTICAS ==========
-    
-    const totalIncome = computed(() => {
-      return filteredRecords.value
-        .filter(r => r.cantidad > 0)
-        .reduce((sum, r) => sum + r.cantidad, 0)
-    })
-
-    const totalExpense = computed(() => {
-      return filteredRecords.value
-        .filter(r => r.cantidad < 0)
-        .reduce((sum, r) => sum + r.cantidad, 0)
-    })
-
-    const totalPeriod = computed(() => {
-      return totalIncome.value + totalExpense.value
-    })
-
-    // ========== DATOS PARA GRÁFICAS ==========
-    
-    // Datos para gráfica de conceptos
-    const conceptData = computed(() => {
-      const concepts = {
-        servicio_internet: { label: 'Servicio Internet', total: 0, color: '#3498db' },
-        gastos_operativos: { label: 'Gastos Operativos', total: 0, color: '#e74c3c' },
-        gasto_administrativo: { label: 'Gasto Admin.', total: 0, color: '#9b59b6' },
-        viaticos: { label: 'Viáticos', total: 0, color: '#1abc9c' },
-        propinas: { label: 'Propinas', total: 0, color: '#f1c40f' },
-        dedicados_clientes: { label: 'Dedicados-Clientes', total: 0, color: '#34495e' },
-        actividades: { label: 'Actividades', total: 0, color: '#e67e22' },
-        venta_almacen: { label: 'Venta Almacen', total: 0, color: '#27ae60' },
-        recarga: { label: 'Recarga', total: 0, color: '#8e44ad' },
-        comisiones: { label: 'Comisiones', total: 0, color: '#16a085' },
-        entrega_efectivo: { label: 'Entrega Efectivo', total: 0, color: '#c0392b' },
-        gastos_personales: { label: 'Gastos Personales', total: 0, color: '#7f8c8d' },
-        pagos_tarjetas: { label: 'Pagos Tarjetas', total: 0, color: '#d35400' },
-        compras: { label: 'Compras', total: 0, color: '#2980b9' },
-        dedicados_pagos: { label: 'Dedicados Pagos', total: 0, color: '#2c3e50' },
-        recibimiento_efectivo: { label: 'Recibimiento', total: 0, color: '#27ae60' },
-        otros: { label: 'Otros', total: 0, color: '#95a5a6' }
-      }
-      
-      filteredRecords.value.forEach(record => {
-        if (concepts[record.concepto]) {
-          concepts[record.concepto].total += Math.abs(record.cantidad)
-        }
-      })
-      
-      const total = Object.values(concepts).reduce((sum, c) => sum + c.total, 0)
-      
-      return Object.values(concepts)
-        .filter(c => c.total > 0)
-        .sort((a, b) => b.total - a.total)
-        .map(c => ({
-          ...c,
-          percentage: total > 0 ? ((c.total / total) * 100).toFixed(1) : '0'
-        }))
-    })
-
-    // Datos para métodos de pago
-    const paymentData = computed(() => {
-      const payments = {
-        efectivo: { label: 'Efectivo', count: 0, color: '#2ecc71' },
-        tarjeta: { label: 'Tarjeta', count: 0, color: '#e74c3c' },
-        terminal: { label: 'Terminal', count: 0, color: '#9b59b6' },
-        transferencia: { label: 'Transferencia', count: 0, color: '#3498db' }
-      }
-      
-      filteredRecords.value.forEach(record => {
-        if (payments[record.metodoPago]) {
-          payments[record.metodoPago].count++
-        }
-      })
-      
-      return Object.values(payments).filter(p => p.count > 0)
-    })
-
-    // Datos para evolución diaria (agrupado por día en México)
-    const dailyData = computed(() => {
-      const dailyMap = {}
-      
-      // Agrupar por día (formato DD/MM/YYYY México)
-      filteredRecords.value.forEach(record => {
-        const fechaMexico = getFechaMexico(record.fecha)
-        const dateKey = `${fechaMexico.getDate().toString().padStart(2, '0')}/${(fechaMexico.getMonth() + 1).toString().padStart(2, '0')}/${fechaMexico.getFullYear()}`
-        
-        if (!dailyMap[dateKey]) {
-          dailyMap[dateKey] = 0
-        }
-        dailyMap[dateKey] += record.cantidad
-      })
-      
-      // Ordenar por fecha
-      const sortedDates = Object.keys(dailyMap).sort((a, b) => {
-        const [diaA, mesA, añoA] = a.split('/').map(Number)
-        const [diaB, mesB, añoB] = b.split('/').map(Number)
-        return new Date(añoA, mesA - 1, diaA) - new Date(añoB, mesB - 1, diaB)
-      })
-      
-      // Calcular acumulado
-      let acumulado = 0
-      const data = sortedDates.map(date => {
-        acumulado += dailyMap[date]
-        return {
-          date,
-          daily: dailyMap[date],
-          acumulado
-        }
-      })
-      
-      return data
+      return filtered
     })
 
     // ========== PAGINACIÓN ==========
@@ -692,6 +510,23 @@ export default {
       const start = (currentPage.value - 1) * pageSize
       const end = start + pageSize
       return filteredRecords.value.slice(start, end)
+    })
+
+    // ========== DATOS PARA GRÁFICAS ==========
+    
+    // Datos para gráfica de conceptos (usando chartData de la API)
+    const conceptData = computed(() => {
+      return chartData.value?.conceptData || []
+    })
+
+    // Datos para métodos de pago
+    const paymentData = computed(() => {
+      return chartData.value?.paymentData || []
+    })
+
+    // Datos para evolución diaria
+    const dailyData = computed(() => {
+      return chartData.value?.dailyData || []
     })
 
     // ========== FUNCIONES PRINCIPALES ==========
@@ -715,10 +550,14 @@ export default {
           to: hoy
         }
       }
+      
+      // Recargar datos
+      loadChartData()
     }
 
     const applyCustomRange = () => {
       currentPage.value = 1
+      loadChartData()
     }
 
     const toggleFilters = () => {
@@ -757,37 +596,8 @@ export default {
       return Math.abs(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
     }
 
-    const getConceptoLabel = (concepto) => {
-      const labels = {
-        servicio_internet: 'Servicio Internet',
-        gastos_operativos: 'Gastos Operativos',
-        gasto_administrativo: 'Gasto Admin.',
-        viaticos: 'Viáticos',
-        propinas: 'Propinas',
-        dedicados_clientes: 'Dedicados-Clientes',
-        actividades: 'Actividades',
-        venta_almacen: 'Venta Almacen',
-        recarga: 'Recarga',
-        comisiones: 'Comisiones',
-        entrega_efectivo: 'Entrega Efectivo',
-        gastos_personales: 'Gastos Personales',
-        pagos_tarjetas: 'Pagos Tarjetas',
-        compras: 'Compras',
-        dedicados_pagos: 'Dedicados Pagos',
-        recibimiento_efectivo: 'Recibimiento',
-        otros: 'Otros'
-      }
-      return labels[concepto] || concepto
-    }
-
-    const getMetodoPagoLabel = (metodo) => {
-      const labels = {
-        efectivo: 'Efectivo',
-        tarjeta: 'Tarjeta',
-        terminal: 'Terminal',
-        transferencia: 'Transferencia'
-      }
-      return labels[metodo] || metodo
+    const getConceptoKey = (concepto) => {
+      return concepto.toLowerCase().replace(/ /g, '_')
     }
 
     const exportToExcel = () => {
@@ -799,8 +609,8 @@ export default {
       const data = filteredRecords.value.map(record => ({
         Fecha: formatDateMexico(record.fecha),
         Nombre: record.nombre,
-        Concepto: getConceptoLabel(record.concepto),
-        'Método Pago': getMetodoPagoLabel(record.metodoPago),
+        Concepto: record.concepto,
+        'Método Pago': record.metodoPago,
         Folio: record.folio || 'N/A',
         Cantidad: record.cantidad,
         Tipo: record.cantidad >= 0 ? 'Ingreso' : 'Egreso'
@@ -835,6 +645,8 @@ export default {
     // ========== INICIALIZACIÓN DE GRÁFICAS ==========
     
     const initCharts = () => {
+      if (!chartData.value) return
+      
       // Destruir gráficos anteriores si existen
       if (incomeExpenseChartInstance) incomeExpenseChartInstance.destroy()
       if (dailyChartInstance) dailyChartInstance.destroy()
@@ -842,7 +654,7 @@ export default {
       if (paymentChartInstance) paymentChartInstance.destroy()
 
       // Gráfica 1: Ingresos vs Egresos
-      if (incomeExpenseChart.value && filteredRecords.value.length > 0) {
+      if (incomeExpenseChart.value) {
         const ctx = incomeExpenseChart.value.getContext('2d')
         incomeExpenseChartInstance = new Chart(ctx, {
           type: 'bar',
@@ -850,7 +662,7 @@ export default {
             labels: ['Ingresos', 'Egresos'],
             datasets: [{
               label: 'Monto ($)',
-              data: [totalIncome.value, Math.abs(totalExpense.value)],
+              data: [chartData.value.totalIncome, chartData.value.totalExpense],
               backgroundColor: ['#27ae60', '#e74c3c'],
               borderColor: ['#219653', '#c0392b'],
               borderWidth: 1,
@@ -1015,21 +827,18 @@ export default {
       }
     }
 
-    // ========== WATCHERS Y MOUNTED ==========
+    // ========== WATCHERS ==========
     
-    // Observar cambios en los datos para actualizar gráficos
-    watch([filteredRecords, activePeriod, dateRange], () => {
-      nextTick(() => {
-        initCharts()
-      })
-    })
+    // Observar cambios en filtros avanzados para reiniciar paginación
+    watch(advancedFilters, () => {
+      currentPage.value = 1
+    }, { deep: true })
 
     // Inicializar al montar
     onMounted(() => {
-      // Cargar permisos del usuario
-      loadUserPermissions()
+      loadUserData()
       
-      // Establecer rango de fechas por defecto (última semana)
+      // Establecer rango de fechas por defecto
       const hoy = getHoyMexico()
       const semanaAtras = new Date(getFechaMexico(hoy))
       semanaAtras.setDate(semanaAtras.getDate() - 7)
@@ -1039,16 +848,20 @@ export default {
         to: hoy
       }
       
-      // Inicializar gráficos después de que el DOM esté listo
-      nextTick(() => {
-        initCharts()
-      })
+      // Cargar datos
+      if (currentUserId.value) {
+        loadChartData()
+      }
     })
 
     return {
       sidebarOpen,
-      currentUserPermissions,
+      loading,
+      loadingRecords,
+      currentUserId,
       canExport,
+      chartData,
+      records,
       incomeExpenseChart,
       dailyChart,
       conceptChart,
@@ -1060,12 +873,11 @@ export default {
       advancedFilters,
       currentPage,
       pageSize,
+      conceptosUnicos,
+      metodosUnicos,
       filteredRecords,
       paginatedRecords,
       totalPages,
-      totalIncome,
-      totalExpense,
-      totalPeriod,
       conceptData,
       paymentData,
       dailyData,
@@ -1080,14 +892,34 @@ export default {
       exportToExcel,
       formatDateMexico,
       formatCurrency,
-      getConceptoLabel,
-      getMetodoPagoLabel
+      getConceptoKey
     }
   }
 }
 </script>
 
 <style scoped>
+/* Mantén todos los estilos originales y añade: */
+.loading-notice {
+  background: #3498db20;
+  border: 1px solid #3498db;
+  border-radius: 6px;
+  padding: 10px 15px;
+  margin-top: 10px;
+  color: #2980b9;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-style: italic;
+}
+
 .charts-page {
   min-height: 100vh;
   background: #f8f9fa;

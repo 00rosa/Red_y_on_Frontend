@@ -7,6 +7,9 @@
       <div class="page-header">
         <h1>Nuevo Registro</h1>
         <p>Complete el formulario para agregar un nuevo registro</p>
+        <div v-if="loading" class="loading-notice">
+          ⏳ Cargando...
+        </div>
         <div v-if="esSabado" class="sabado-notice">
           ⚠️ Hoy es sábado - Se debe reiniciar la Caja Inicial y registros
         </div>
@@ -29,13 +32,14 @@
                 min="0"
                 class="widget-input"
                 placeholder="Ingrese monto"
+                :disabled="updatingCaja"
               >
               <button 
                 @click="actualizarCajaInicial" 
                 class="btn-actualizar-caja"
-                :disabled="!nuevaCajaInicial || nuevaCajaInicial <= 0"
+                :disabled="!nuevaCajaInicial || nuevaCajaInicial <= 0 || updatingCaja"
               >
-                Actualizar
+                {{ updatingCaja ? 'Actualizando...' : 'Actualizar' }}
               </button>
               <small class="widget-hint">Cada sábado se reinicia</small>
               <div v-if="esSabado" class="reinicio-info">
@@ -65,13 +69,14 @@
                 min="0"
                 class="widget-input"
                 placeholder="Monto disponible"
+                :disabled="updatingCaja"
               >
               <button 
                 @click="actualizarDineroInicial" 
                 class="btn-actualizar-caja"
-                :disabled="!nuevoDineroInicial || nuevoDineroInicial <= 0 || nuevoDineroInicial > cajaInicial"
+                :disabled="!nuevoDineroInicial || nuevoDineroInicial <= 0 || nuevoDineroInicial > cajaInicial || updatingCaja"
               >
-                Actualizar
+                {{ updatingCaja ? 'Actualizando...' : 'Actualizar' }}
               </button>
               <small class="widget-hint">Máximo: ${{ formatCurrency(cajaInicial) }}</small>
               <div v-if="nuevoDineroInicial > cajaInicial" class="error-message">
@@ -115,6 +120,7 @@
                   v-model="form.fecha" 
                   required
                   :max="getMaxFecha()"
+                  :disabled="submitting"
                 >
                 <small class="field-hint">Puede seleccionar cualquier fecha</small>
               </div>
@@ -129,34 +135,21 @@
                   @input="validarNombre"
                   pattern="[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+"
                   title="Solo se permiten letras y espacios"
-                  :disabled="soloVer"
+                  :disabled="soloVer || submitting"
                 >
                 <small class="field-hint">Solo letras y espacios</small>
               </div>
 
               <div class="form-group">
                 <label>Concepto:</label>
-                <select v-model="form.concepto" required :disabled="soloVer">
+                <select v-model="form.conceptoId" required :disabled="soloVer || submitting || loadingCatalogos">
                   <option value="">Seleccione concepto</option>
-                  <option value="servicio_internet">Servicio de Internet</option>
-                  <option value="gastos_operativos">Gastos Operativos</option>
-                  <option value="gasto_administrativo">Gasto Admin.</option>
-                  <option value="viaticos">Viáticos</option>
-                  <option value="propinas">Propinas</option>
-                  <option value="dedicados_clientes">Dedicados-Clientes</option>
-                  <option value="actividades">Actividades</option>
-                  <option value="venta_almacen">Venta de Almacen</option>
-                  <option value="recarga">Recarga</option>
-                  <option value="comisiones">Comisiones</option>
-                  <option value="entrega_efectivo">Entrega Efectivo</option>
-                  <option value="gastos_personales">Gastos Personales</option>
-                  <option value="pagos_tarjetas">Pagos a Tarjetas</option>
-                  <option value="compras">Compras</option>
-                  <option value="dedicados_pagos">Dedicados Pagos</option>
-                  <option value="recibimiento_efectivo">Recibimiento de efectivo</option>
-                  <option value="otros">Otros</option>
+                  <option v-for="concepto in conceptos" :key="concepto.id" :value="concepto.id">
+                    {{ concepto.nombre }}
+                  </option>
                 </select>
-                <small class="field-hint">Seleccione un concepto</small>
+                <small class="field-hint" v-if="loadingCatalogos">Cargando conceptos...</small>
+                <small class="field-hint" v-else>Seleccione un concepto</small>
               </div>
 
               <!-- Dato Extra (no obligatorio) -->
@@ -169,21 +162,21 @@
                   @input="validarFolio"
                   pattern="[A-Za-z0-9]*"
                   title="Solo letras y números, sin espacios (opcional)"
-                  :disabled="soloVer"
+                  :disabled="soloVer || submitting"
                 >
                 <small class="field-hint">Opcional - Solo letras y números</small>
               </div>
 
               <div class="form-group">
                 <label>Método de Pago:</label>
-                <select v-model="form.metodoPago" required :disabled="soloVer">
+                <select v-model="form.metodoPagoId" required :disabled="soloVer || submitting || loadingCatalogos">
                   <option value="">Seleccione método</option>
-                  <option value="efectivo">Efectivo</option>
-                  <option value="tarjeta">Tarjeta</option>
-                  <option value="terminal">Terminal</option>
-                  <option value="transferencia">Transferencia</option>
+                  <option v-for="metodo in metodosPago" :key="metodo.id" :value="metodo.id">
+                    {{ metodo.nombre }}
+                  </option>
                 </select>
-                <small class="field-hint">Seleccione un método de pago</small>
+                <small class="field-hint" v-if="loadingCatalogos">Cargando métodos...</small>
+                <small class="field-hint" v-else>Seleccione un método de pago</small>
               </div>
 
               <div class="form-group">
@@ -196,7 +189,7 @@
                     step="0.01" 
                     required
                     :class="form.cantidad >= 0 ? 'positive' : 'negative'"
-                    :disabled="!currentUserPermissions.crearRegistros || soloVer"
+                    :disabled="!currentUserPermissions.crearRegistros || soloVer || submitting"
                   >
                   <span class="amount-hint">
                     {{ form.cantidad >= 0 ? '(Ingreso)' : '(Egreso)' }}
@@ -218,9 +211,9 @@
               <button 
                 type="submit" 
                 class="btn-primary"
-                :disabled="!currentUserPermissions.crearRegistros || !formValido || soloVer"
+                :disabled="!currentUserPermissions.crearRegistros || !formValido || soloVer || submitting"
               >
-                Agregar
+                {{ submitting ? 'Guardando...' : 'Agregar' }}
               </button>
             </div>
           </form>
@@ -265,6 +258,7 @@
                 :key="period"
                 :class="['period-btn', { active: activeFilter === period }]"
                 @click="setFilter(period)"
+                :disabled="loadingRecords"
               >
                 {{ period }}
               </button>
@@ -272,10 +266,12 @@
           </div>
 
           <div class="records-table">
-            <table>
+            <div v-if="loadingRecords" class="loading-indicator">
+              Cargando registros...
+            </div>
+            <table v-else>
               <thead>
                 <tr>
-                  <!-- Columna ID -->
                   <th>ID</th>
                   <th>Fecha</th>
                   <th>Nombre</th>
@@ -284,25 +280,22 @@
                   <th>Dato Extra</th>
                   <th>Cantidad</th>
                   <th>Creado por</th>
-                  <!-- Comentarios (editable) -->
                   <th>Comentarios</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(record, index) in recordsParaMostrar" :key="record.id">
-                  <!-- ID autoincremental (índice + 1) -->
                   <td class="id-column">{{ index + 1 }}</td>
-                  
                   <td>{{ formatFechaMexico(record.fecha) }}</td>
                   <td>{{ record.nombre }}</td>
                   <td>
-                    <span class="concept-tag" :class="record.concepto">
-                      {{ getConceptoLabel(record.concepto) }}
+                    <span class="concept-tag" :class="getConceptoKey(record.concepto)">
+                      {{ record.concepto }}
                     </span>
                   </td>
                   <td>
-                    <span class="payment-tag">{{ getMetodoPagoLabel(record.metodoPago) }}</span>
+                    <span class="payment-tag">{{ record.metodoPago }}</span>
                   </td>
                   <td>{{ record.folio || '-' }}</td>
                   <td :class="record.cantidad >= 0 ? 'positive' : 'negative'">
@@ -311,7 +304,6 @@
                   <td>
                     <small>{{ record.creadoPor || 'Sistema' }}</small>
                   </td>
-                  <!-- Columna de comentarios con control de permisos -->
                   <td class="comments-cell">
                     <div v-if="record.editandoComentario" class="comment-edit">
                       <input 
@@ -321,12 +313,11 @@
                         placeholder="Escribir comentario..."
                         @keyup.enter="guardarComentarioEdit(record)"
                         @keyup.esc="cancelarComentarioEdit(record)"
-                        ref="comentarioInput"
-                        :disabled="!puedeEditarComentarios"
+                        :disabled="!puedeEditarComentarios || updatingComment"
                       >
                       <div v-if="puedeEditarComentarios" class="comment-actions">
-                        <button @click="guardarComentarioEdit(record)" class="btn-comment-save" title="Guardar">✓</button>
-                        <button @click="cancelarComentarioEdit(record)" class="btn-comment-cancel" title="Cancelar">✗</button>
+                        <button @click="guardarComentarioEdit(record)" class="btn-comment-save" :disabled="updatingComment" title="Guardar">✓</button>
+                        <button @click="cancelarComentarioEdit(record)" class="btn-comment-cancel" :disabled="updatingComment" title="Cancelar">✗</button>
                       </div>
                     </div>
                     <div v-else class="comment-display">
@@ -341,7 +332,6 @@
                       </button>
                     </div>
                   </td>
-                  <!-- Botón de imprimir con control de permiso -->
                   <td class="print-cell">
                     <button 
                       v-if="puedeImprimir"
@@ -369,10 +359,17 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/Layout/Header.vue'
 import AppSidebar from '@/components/Layout/Sidebar.vue'
+import { 
+  getRecords, 
+  createRecord, 
+  updateRecordComment,
+  getConceptos,
+  getMetodosPago 
+} from '@/api'
 
 export default {
   name: 'TablesView',
@@ -383,7 +380,14 @@ export default {
   setup() {
     const router = useRouter()
     const sidebarOpen = ref(false)
-    const comentarioInput = ref(null)
+    
+    // Estados de carga
+    const loading = ref(false)
+    const loadingRecords = ref(false)
+    const loadingCatalogos = ref(false)
+    const submitting = ref(false)
+    const updatingCaja = ref(false)
+    const updatingComment = ref(false)
     
     // Widgets de caja
     const cajaInicial = ref(10000)
@@ -391,18 +395,214 @@ export default {
     const nuevaCajaInicial = ref('')
     const nuevoDineroInicial = ref('')
     
-    // Permisos del usuario (ACTUALIZADO con permiso de imprimir)
-    const currentUserPermissions = ref({
-      crearRegistros: false,
-      soloVer: false,
-      editarComentarios: false,
-      imprimir: false,
-      modificarCajaInicial: false,
-      modificarDineroInicial: false,
-      exportarDatos: false
-    })
+    // Datos del usuario actual
+    const currentUser = ref(null)
+    const currentUserPermissions = ref({})
+    const currentUserId = ref(null)
     
-    const currentUsername = ref('')
+    // Catálogos
+    const conceptos = ref([])
+    const metodosPago = ref([])
+    
+    // Mapeo para convertir nombre a ID
+    const conceptoMap = ref({})
+    const metodoPagoMap = ref({})
+
+    const form = ref({
+      fecha: getHoyMexico(),
+      nombre: '',
+      conceptoId: null,
+      folio: '',
+      metodoPagoId: null,
+      cantidad: 0
+    })
+
+    const records = ref([])
+    const filterPeriods = ['Día', 'Semana', 'Mes', 'Año', 'Todos']
+    const activeFilter = ref('Todos')
+
+    // Cargar datos al montar
+    onMounted(async () => {
+      await loadUserData()
+      await loadCatalogos()
+      await loadCajaData()
+      await loadRecordsFromAPI()
+    })
+
+    // Cargar datos del usuario desde localStorage
+    const loadUserData = () => {
+      const userStr = localStorage.getItem('currentUser')
+      if (userStr) {
+        try {
+          currentUser.value = JSON.parse(userStr)
+          currentUserId.value = currentUser.value.id
+          currentUserPermissions.value = currentUser.value.permissions || {}
+        } catch (e) {
+          console.error('Error parsing currentUser:', e)
+          router.push('/login')
+        }
+      } else {
+        router.push('/login')
+      }
+    }
+
+    // Cargar catálogos desde API
+    const loadCatalogos = async () => {
+      loadingCatalogos.value = true
+      try {
+        const [conceptosData, metodosData] = await Promise.all([
+          getConceptos(),
+          getMetodosPago()
+        ])
+        
+        conceptos.value = conceptosData
+        metodosPago.value = metodosData
+        
+        // Crear mapas para convertir
+        conceptosData.forEach(c => {
+          conceptoMap.value[c.nombre.toLowerCase()] = c.id
+        })
+        
+        metodosData.forEach(m => {
+          metodoPagoMap.value[m.nombre.toLowerCase()] = m.id
+        })
+      } catch (error) {
+        console.error('Error cargando catálogos:', error)
+        alert('Error al cargar catálogos')
+      } finally {
+        loadingCatalogos.value = false
+      }
+    }
+
+    // Cargar datos de caja desde API
+    const loadCajaData = async () => {
+      // TODO: Implementar cuando tengas el endpoint de caja
+      // Por ahora mantener valores por defecto
+    }
+
+    // Cargar registros desde API
+    const loadRecordsFromAPI = async () => {
+      if (!currentUserId.value) return
+      
+      loadingRecords.value = true
+      try {
+        const periodo = activeFilter.value !== 'Todos' 
+          ? activeFilter.value.toLowerCase() 
+          : null
+        
+        const data = await getRecords(currentUserId.value, periodo)
+        
+        // Transformar datos al formato de la tabla
+        records.value = data.map(r => ({
+          id: r.id,
+          fecha: r.fecha,
+          nombre: r.nombre,
+          concepto: r.concepto,
+          folio: r.folio || '',
+          metodoPago: r.metodoPago,
+          cantidad: r.cantidad,
+          comentario: r.comentario || '',
+          creadoPor: r.creadoPor || 'Sistema',
+          editandoComentario: false,
+          comentarioTemp: r.comentario || ''
+        }))
+      } catch (error) {
+        console.error('Error cargando registros:', error)
+        alert('Error al cargar registros')
+      } finally {
+        loadingRecords.value = false
+      }
+    }
+
+    // Guardar nuevo registro
+    const handleSubmit = async () => {
+      if (!currentUserPermissions.value.crearRegistros) {
+        alert('❌ No tienes permiso para crear registros')
+        return
+      }
+
+      // Validaciones
+      if (!form.value.nombre.trim()) {
+        alert('❌ El nombre es requerido')
+        return
+      }
+
+      if (!form.value.conceptoId) {
+        alert('❌ Debe seleccionar un concepto')
+        return
+      }
+
+      if (!form.value.metodoPagoId) {
+        alert('❌ Debe seleccionar un método de pago')
+        return
+      }
+
+      if (form.value.cantidad === 0) {
+        alert('❌ La cantidad no puede ser cero')
+        return
+      }
+
+      submitting.value = true
+      try {
+        await createRecord({
+          fecha: form.value.fecha,
+          nombre: form.value.nombre,
+          conceptoId: form.value.conceptoId,
+          folio: form.value.folio?.toUpperCase() || '',
+          metodoPagoId: form.value.metodoPagoId,
+          cantidad: form.value.cantidad,
+          usuarioId: currentUserId.value,
+          comentario: ''
+        })
+
+        alert('✅ Registro agregado exitosamente')
+        
+        // Limpiar formulario
+        form.value = {
+          fecha: getHoyMexico(),
+          nombre: '',
+          conceptoId: null,
+          folio: '',
+          metodoPagoId: null,
+          cantidad: 0
+        }
+        
+        // Recargar registros
+        await loadRecordsFromAPI()
+        
+      } catch (error) {
+        alert('❌ ' + (error.mensaje || 'Error al guardar el registro'))
+      } finally {
+        submitting.value = false
+      }
+    }
+
+    // Guardar comentario
+    const guardarComentarioEdit = async (record) => {
+      if (!currentUserPermissions.value.editarComentarios) {
+        alert('❌ No tienes permiso para editar comentarios')
+        return
+      }
+      
+      updatingComment.value = true
+      try {
+        await updateRecordComment(record.id, currentUserId.value, record.comentarioTemp)
+        
+        record.comentario = record.comentarioTemp
+        record.editandoComentario = false
+        
+        alert('✅ Comentario actualizado')
+      } catch (error) {
+        alert('❌ ' + (error.mensaje || 'Error al actualizar comentario'))
+      } finally {
+        updatingComment.value = false
+      }
+    }
+
+    // Función para obtener la clave del concepto (para CSS)
+    const getConceptoKey = (conceptoNombre) => {
+      return conceptoNombre.toLowerCase().replace(/ /g, '_')
+    }
 
     // Función para verificar si hoy es sábado
     const esSabado = computed(() => {
@@ -413,9 +613,7 @@ export default {
       return hoyMexico.getDay() === 6
     })
 
-    const getMaxFecha = () => {
-      return undefined
-    }
+    const getMaxFecha = () => undefined
 
     const getHoyMexico = () => {
       const now = new Date()
@@ -432,7 +630,6 @@ export default {
 
     const getFechaMexico = (fechaString) => {
       if (!fechaString) return new Date()
-      
       const fecha = new Date(fechaString)
       const offsetMexico = -6 * 60
       const utc = fecha.getTime() + (fecha.getTimezoneOffset() * 60000)
@@ -441,21 +638,17 @@ export default {
 
     const formatFechaMexico = (dateString) => {
       if (!dateString) return ''
-      
       try {
         if (dateString.includes('-')) {
           const [año, mes, dia] = dateString.split('-')
           return `${dia}/${mes}/${año}`
         }
-        
         const fechaMexico = getFechaMexico(dateString)
         const dia = String(fechaMexico.getDate()).padStart(2, '0')
         const mes = String(fechaMexico.getMonth() + 1).padStart(2, '0')
         const año = fechaMexico.getFullYear()
-        
         return `${dia}/${mes}/${año}`
       } catch (error) {
-        console.error('Error formateando fecha:', dateString, error)
         return dateString
       }
     }
@@ -464,240 +657,38 @@ export default {
       const input = event.target
       const valor = input.value
       const regex = /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]*$/
-      
       if (!regex.test(valor)) {
         input.value = valor.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g, '')
         form.value.nombre = input.value
       }
     }
 
-    // Validación de folio (opcional)
     const validarFolio = (event) => {
       const input = event.target
       const valor = input.value
       const regex = /^[A-Za-z0-9]*$/
-      
       if (valor && !regex.test(valor)) {
         input.value = valor.replace(/[^A-Za-z0-9]/g, '')
         form.value.folio = input.value
       }
-      
       if (input.value) {
         input.value = input.value.toUpperCase()
         form.value.folio = input.value
       }
     }
 
-    const form = ref({
-      fecha: getHoyMexico(),
-      nombre: '',
-      concepto: '',
-      folio: '',
-      metodoPago: '',
-      cantidad: 0
-    })
-
-    const records = ref([])
-    const filterPeriods = ['Día', 'Semana', 'Mes', 'Año', 'Todos']
-    const activeFilter = ref('Todos')
-
-    onMounted(() => {
-      cargarDesdeLocalStorage()
-      loadUserPermissions()
-      verificarReinicioSabado()
-    })
-
-    // ACTUALIZADO: Carga los nuevos permisos (incluyendo imprimir)
-    const loadUserPermissions = () => {
-      try {
-        let username = localStorage.getItem('currentUsername')
-        
-        if (!username) {
-          const currentUserStr = localStorage.getItem('currentUser')
-          if (currentUserStr) {
-            try {
-              const currentUser = JSON.parse(currentUserStr)
-              username = currentUser.username
-              localStorage.setItem('currentUsername', username)
-            } catch (e) {
-              console.error('Error parseando currentUser:', e)
-            }
-          }
-        }
-        
-        if (!username) {
-          username = 'operador'
-        }
-        
-        currentUsername.value = username
-        
-        const savedUsers = localStorage.getItem('redyon_users')
-        
-        if (savedUsers) {
-          try {
-            const users = JSON.parse(savedUsers)
-            const currentUser = users.find(u => u.username === username)
-            
-            if (currentUser && currentUser.permissions) {
-              // Mapear los nuevos permisos
-              currentUserPermissions.value = {
-                crearRegistros: currentUser.permissions.crearRegistros || false,
-                soloVer: currentUser.permissions.soloVer || false,
-                editarComentarios: currentUser.permissions.editarComentarios || false,
-                imprimir: currentUser.permissions.imprimir || false,
-                modificarCajaInicial: currentUser.permissions.modificarCajaInicial || false,
-                modificarDineroInicial: currentUser.permissions.modificarDineroInicial || false,
-                exportarDatos: currentUser.permissions.exportarDatos || false
-              }
-            } else {
-              setDefaultPermissions()
-            }
-          } catch (e) {
-            console.error('Error parseando redyon_users:', e)
-            setDefaultPermissions()
-          }
-        } else {
-          setDefaultPermissions()
-        }
-      } catch (error) {
-        console.error('Error cargando permisos:', error)
-        setDefaultPermissions()
-      }
-    }
-
-    const setDefaultPermissions = () => {
-      currentUserPermissions.value = {
-        crearRegistros: false,
-        soloVer: false,
-        editarComentarios: false,
-        imprimir: false,
-        modificarCajaInicial: false,
-        modificarDineroInicial: false,
-        exportarDatos: false
-      }
-    }
-
-    // Computed para modo solo ver
-    const soloVer = computed(() => {
-      return currentUserPermissions.value.soloVer || false
-    })
-
-    // Computed para editar comentarios
-    const puedeEditarComentarios = computed(() => {
-      return currentUserPermissions.value.editarComentarios || false
-    })
-
-    // Computed para imprimir
-    const puedeImprimir = computed(() => {
-      return currentUserPermissions.value.imprimir || false
-    })
-
-    const verificarReinicioSabado = () => {
-      if (!esSabado.value) return
-      
-      const ultimoSabadoGuardado = localStorage.getItem('redyon_ultimoSabado')
-      const hoy = getHoyMexico()
-      
-      if (ultimoSabadoGuardado !== hoy) {
-        if (confirm('Hoy es sábado. ¿Desea reiniciar la caja inicial y todos los registros?')) {
-          const nuevaCaja = prompt(
-            'Ingrese el nuevo valor para la Caja Inicial:',
-            '10000'
-          )
-          
-          if (nuevaCaja !== null && !isNaN(parseFloat(nuevaCaja))) {
-            cajaInicial.value = parseFloat(nuevaCaja)
-            dineroInicial.value = Math.round(parseFloat(nuevaCaja) * 0.5)
-            records.value = []
-            localStorage.setItem('redyon_ultimoSabado', hoy)
-            guardarEnLocalStorage()
-            alert('✅ Caja y registros reiniciados para el nuevo período')
-          }
-        }
-      }
-    }
-
-    const cargarDesdeLocalStorage = () => {
-      const savedCaja = localStorage.getItem('redyon_cajaInicial')
-      const savedDinero = localStorage.getItem('redyon_dineroInicial')
-      const savedRecords = localStorage.getItem('redyon_records')
-      const savedSabado = localStorage.getItem('redyon_ultimoSabado')
-      
-      if (savedCaja) cajaInicial.value = parseFloat(savedCaja)
-      if (savedDinero) dineroInicial.value = parseFloat(savedDinero)
-      if (savedRecords) {
-        records.value = JSON.parse(savedRecords)
-        // Asegurar que todos los registros tengan los campos necesarios
-        records.value.forEach(record => {
-          if (!record.hasOwnProperty('comentario')) {
-            record.comentario = ''
-          }
-          if (!record.hasOwnProperty('editandoComentario')) {
-            record.editandoComentario = false
-          }
-          if (!record.hasOwnProperty('comentarioTemp')) {
-            record.comentarioTemp = record.comentario || ''
-          }
-        })
-      }
-      
-      if (!savedSabado) {
-        localStorage.setItem('redyon_ultimoSabado', getHoyMexico())
-      }
-    }
-
-    const guardarEnLocalStorage = () => {
-      // Limpiar campos temporales antes de guardar
-      const recordsParaGuardar = records.value.map(record => {
-        const { editandoComentario, comentarioTemp, ...recordLimpio } = record
-        return recordLimpio
-      })
-      localStorage.setItem('redyon_cajaInicial', cajaInicial.value)
-      localStorage.setItem('redyon_dineroInicial', dineroInicial.value)
-      localStorage.setItem('redyon_records', JSON.stringify(recordsParaGuardar))
-    }
-
     const toggleSidebar = () => {
       sidebarOpen.value = !sidebarOpen.value
     }
 
-    const actualizarCajaInicial = () => {
-      if (!nuevaCajaInicial.value || nuevaCajaInicial.value <= 0) {
-        alert('Ingrese un monto válido para la caja inicial')
-        return
-      }
-      
-      const nuevaCaja = parseFloat(nuevaCajaInicial.value)
-      cajaInicial.value = nuevaCaja
-      
-      if (dineroInicial.value > nuevaCaja) {
-        dineroInicial.value = nuevaCaja
-        alert(`Caja inicial actualizada. Dinero inicial ajustado a $${formatCurrency(nuevaCaja)}`)
-      } else {
-        alert(`Caja inicial actualizada a $${formatCurrency(nuevaCaja)}`)
-      }
-      
-      nuevaCajaInicial.value = ''
-      guardarEnLocalStorage()
+    const actualizarCajaInicial = async () => {
+      // TODO: Implementar cuando tengas el endpoint
+      alert('Función en desarrollo')
     }
 
-    const actualizarDineroInicial = () => {
-      if (!nuevoDineroInicial.value || nuevoDineroInicial.value <= 0) {
-        alert('Ingrese un monto válido para el dinero inicial')
-        return
-      }
-      
-      const nuevoDinero = parseFloat(nuevoDineroInicial.value)
-      
-      if (nuevoDinero > cajaInicial.value) {
-        alert(`El dinero inicial no puede exceder la caja inicial de $${formatCurrency(cajaInicial.value)}`)
-        return
-      }
-      
-      dineroInicial.value = nuevoDinero
-      nuevoDineroInicial.value = ''
-      guardarEnLocalStorage()
-      alert(`Dinero inicial actualizado a $${formatCurrency(nuevoDinero)}`)
+    const actualizarDineroInicial = async () => {
+      // TODO: Implementar cuando tengas el endpoint
+      alert('Función en desarrollo')
     }
 
     const dineroFinal = computed(() => {
@@ -722,130 +713,32 @@ export default {
 
     const formValido = computed(() => {
       return form.value.nombre.trim() !== '' &&
-             form.value.concepto !== '' &&
-             form.value.metodoPago !== '' &&
+             form.value.conceptoId &&
+             form.value.metodoPagoId &&
              form.value.cantidad !== 0
     })
 
-    const handleSubmit = async () => {
-      try {
-        if (!currentUserPermissions.value.crearRegistros) {
-          alert('❌ No tienes permiso para crear registros')
-          return
-        }
+    const soloVer = computed(() => {
+      return currentUserPermissions.value.soloVer || false
+    })
 
-        if (soloVer.value) {
-          alert('❌ Modo solo lectura - No puedes crear registros')
-          return
-        }
+    const puedeEditarComentarios = computed(() => {
+      return currentUserPermissions.value.editarComentarios || false
+    })
 
-        if (!/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(form.value.nombre)) {
-          alert('❌ El nombre solo puede contener letras y espacios')
-          return
-        }
+    const puedeImprimir = computed(() => {
+      return currentUserPermissions.value.imprimir || false
+    })
 
-        if (form.value.folio && !/^[A-Za-z0-9]+$/.test(form.value.folio)) {
-          alert('❌ El folio solo puede contener letras y números (sin espacios)')
-          return
-        }
-
-        if (!form.value.concepto) {
-          alert('❌ Debe seleccionar un concepto')
-          return
-        }
-
-        if (!form.value.metodoPago) {
-          alert('❌ Debe seleccionar un método de pago')
-          return
-        }
-
-        if (!form.value.fecha) {
-          alert('❌ Debe seleccionar una fecha')
-          return
-        }
-
-        if (form.value.cantidad < 0) {
-          const saldoDespuesEgreso = dineroFinal.value + form.value.cantidad
-          if (saldoDespuesEgreso < 0) {
-            alert(`❌ Fondos insuficientes. Saldo disponible: $${formatCurrency(dineroFinal.value)}`)
-            return
-          }
-        }
-
-        const newRecord = {
-          id: Date.now(),
-          ...form.value,
-          folio: form.value.folio ? form.value.folio.toUpperCase() : '',
-          comentario: '',
-          editandoComentario: false,
-          comentarioTemp: '',
-          creadoPor: currentUsername.value,
-          fechaCreacion: new Date().toISOString()
-        }
-        
-        records.value.push(newRecord)
-        
-        guardarEnLocalStorage()
-
-        form.value = {
-          fecha: getHoyMexico(),
-          nombre: '',
-          concepto: '',
-          folio: '',
-          metodoPago: '',
-          cantidad: 0
-        }
-
-        alert('✅ Registro agregado exitosamente')
-      } catch (error) {
-        console.error('Error al guardar:', error)
-        alert('❌ Error al guardar el registro')
-      }
-    }
-
-    const goToCharts = () => {
-      if (!currentUserPermissions.value.exportarDatos) {
-        alert('❌ No tienes permiso para exportar datos')
-        return
-      }
-      router.push('/charts')
-    }
-
-    const setFilter = (period) => {
+    const setFilter = async (period) => {
       activeFilter.value = period
+      await loadRecordsFromAPI()
     }
 
     const recordsParaMostrar = computed(() => {
-      let registrosFiltrados = [...records.value]
-      
-      if (activeFilter.value !== 'Todos') {
-        const hoyMexico = getFechaMexico(getHoyMexico())
-        hoyMexico.setHours(0, 0, 0, 0)
-        
-        registrosFiltrados = registrosFiltrados.filter(record => {
-          const recordDate = getFechaMexico(record.fecha)
-          recordDate.setHours(0, 0, 0, 0)
-          const diffTime = hoyMexico - recordDate
-          const diffDays = diffTime / (1000 * 60 * 60 * 24)
-          
-          switch(activeFilter.value) {
-            case 'Día': return diffDays < 1
-            case 'Semana': return diffDays < 7
-            case 'Mes': return diffDays < 30
-            case 'Año': return diffDays < 365
-            default: return true
-          }
-        })
-      }
-      
-      return registrosFiltrados.sort((a, b) => {
-        const fechaA = a.fechaCreacion ? new Date(a.fechaCreacion) : a.id
-        const fechaB = b.fechaCreacion ? new Date(b.fechaCreacion) : b.id
-        return fechaA - fechaB
-      })
+      return records.value
     })
 
-    // Funciones para editar comentarios (controladas por permiso)
     const editarComentario = (record) => {
       if (!puedeEditarComentarios.value) {
         alert('❌ No tienes permiso para editar comentarios')
@@ -853,7 +746,6 @@ export default {
       }
       record.comentarioTemp = record.comentario || ''
       record.editandoComentario = true
-      // Enfocar el input después de que se renderice
       nextTick(() => {
         const inputs = document.querySelectorAll('.comment-input')
         if (inputs.length > 0) {
@@ -862,27 +754,11 @@ export default {
       })
     }
 
-    const guardarComentarioEdit = (record) => {
-      if (!puedeEditarComentarios.value) {
-        alert('❌ No tienes permiso para editar comentarios')
-        return
-      }
-      record.comentario = record.comentarioTemp
-      record.editandoComentario = false
-      guardarEnLocalStorage()
-    }
-
     const cancelarComentarioEdit = (record) => {
       record.editandoComentario = false
       record.comentarioTemp = record.comentario || ''
     }
 
-    // Función para guardar comentarios (mantener compatibilidad)
-    const guardarComentario = (record) => {
-      guardarEnLocalStorage()
-    }
-
-    // Función para imprimir registro (con control de permiso)
     const imprimirRegistro = (record, index) => {
       if (!puedeImprimir.value) {
         alert('❌ No tienes permiso para imprimir')
@@ -890,7 +766,6 @@ export default {
       }
 
       const ventanaImpresion = window.open('', '_blank')
-      
       const contenido = `
         <!DOCTYPE html>
         <html>
@@ -905,60 +780,26 @@ export default {
             .valor { margin-left: 10px; }
             .positivo { color: #27ae60; }
             .negativo { color: #e74c3c; }
-            @media print {
-              button { display: none; }
-            }
+            @media print { button { display: none; } }
           </style>
         </head>
         <body>
           <h1>Comprobante de Registro</h1>
           <div class="registro">
-            <div class="campo">
-              <span class="label">ID:</span>
-              <span class="valor">${index + 1}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Fecha:</span>
-              <span class="valor">${formatFechaMexico(record.fecha)}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Nombre:</span>
-              <span class="valor">${record.nombre}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Concepto:</span>
-              <span class="valor">${getConceptoLabel(record.concepto)}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Dato Extra:</span>
-              <span class="valor">${record.folio || '-'}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Método de Pago:</span>
-              <span class="valor">${getMetodoPagoLabel(record.metodoPago)}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Cantidad:</span>
-              <span class="valor ${record.cantidad >= 0 ? 'positivo' : 'negativo'}">
-                $${Math.abs(record.cantidad).toFixed(2)} ${record.cantidad >= 0 ? '(Ingreso)' : '(Egreso)'}
-              </span>
-            </div>
-            <div class="campo">
-              <span class="label">Creado por:</span>
-              <span class="valor">${record.creadoPor || 'Sistema'}</span>
-            </div>
-            <div class="campo">
-              <span class="label">Comentarios:</span>
-              <span class="valor">${record.comentario || '-'}</span>
-            </div>
+            <div class="campo"><span class="label">ID:</span><span class="valor">${index + 1}</span></div>
+            <div class="campo"><span class="label">Fecha:</span><span class="valor">${formatFechaMexico(record.fecha)}</span></div>
+            <div class="campo"><span class="label">Nombre:</span><span class="valor">${record.nombre}</span></div>
+            <div class="campo"><span class="label">Concepto:</span><span class="valor">${record.concepto}</span></div>
+            <div class="campo"><span class="label">Dato Extra:</span><span class="valor">${record.folio || '-'}</span></div>
+            <div class="campo"><span class="label">Método de Pago:</span><span class="valor">${record.metodoPago}</span></div>
+            <div class="campo"><span class="label">Cantidad:</span><span class="valor ${record.cantidad >= 0 ? 'positivo' : 'negativo'}">$${Math.abs(record.cantidad).toFixed(2)} ${record.cantidad >= 0 ? '(Ingreso)' : '(Egreso)'}</span></div>
+            <div class="campo"><span class="label">Creado por:</span><span class="valor">${record.creadoPor || 'Sistema'}</span></div>
+            <div class="campo"><span class="label">Comentarios:</span><span class="valor">${record.comentario || '-'}</span></div>
           </div>
-          <div style="margin-top: 20px; text-align: center;">
-            <button onclick="window.print()">Imprimir</button>
-          </div>
+          <div style="margin-top:20px; text-align:center;"><button onclick="window.print()">Imprimir</button></div>
         </body>
         </html>
       `
-      
       ventanaImpresion.document.write(contenido)
       ventanaImpresion.document.close()
     }
@@ -967,45 +808,14 @@ export default {
       return Math.abs(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
     }
 
-    const getConceptoLabel = (concepto) => {
-      const labels = {
-        servicio_internet: 'Servicio Internet',
-        gastos_operativos: 'Gastos Operativos',
-        gasto_administrativo: 'Gasto Admin.',
-        viaticos: 'Viáticos',
-        propinas: 'Propinas',
-        dedicados_clientes: 'Dedicados-Clientes',
-        actividades: 'Actividades',
-        venta_almacen: 'Venta Almacen',
-        recarga: 'Recarga',
-        comisiones: 'Comisiones',
-        entrega_efectivo: 'Entrega Efectivo',
-        gastos_personales: 'Gastos Personales',
-        pagos_tarjetas: 'Pagos Tarjetas',
-        compras: 'Compras',
-        dedicados_pagos: 'Dedicados Pagos',
-        recibimiento_efectivo: 'Recibimiento',
-        otros: 'Otros'
-      }
-      return labels[concepto] || concepto
-    }
-
-    const getMetodoPagoLabel = (metodo) => {
-      const labels = {
-        efectivo: 'Efectivo',
-        tarjeta: 'Tarjeta',
-        terminal: 'Terminal',
-        transferencia: 'Transferencia'
-      }
-      return labels[metodo] || metodo
-    }
-
-    watch(records, () => {
-      guardarEnLocalStorage()
-    }, { deep: true })
-
     return {
       sidebarOpen,
+      loading,
+      loadingRecords,
+      loadingCatalogos,
+      submitting,
+      updatingCaja,
+      updatingComment,
       cajaInicial,
       dineroInicial,
       nuevaCajaInicial,
@@ -1014,7 +824,8 @@ export default {
       totalIngresos,
       totalEgresos,
       currentUserPermissions,
-      currentUsername,
+      conceptos,
+      metodosPago,
       form,
       records,
       filterPeriods,
@@ -1025,25 +836,20 @@ export default {
       soloVer,
       puedeEditarComentarios,
       puedeImprimir,
-      comentarioInput,
       toggleSidebar,
       actualizarCajaInicial,
       actualizarDineroInicial,
       handleSubmit,
-      goToCharts,
       setFilter,
       formatFechaMexico,
       formatCurrency,
-      getConceptoLabel,
-      getMetodoPagoLabel,
+      getConceptoKey,
       validarNombre,
       validarFolio,
-      guardarComentario,
       imprimirRegistro,
       editarComentario,
       guardarComentarioEdit,
       cancelarComentarioEdit,
-      guardarEnLocalStorage,
       getHoyMexico,
       getMaxFecha
     }
@@ -1052,6 +858,27 @@ export default {
 </script>
 
 <style scoped>
+/* Mantén todos los estilos originales y añade: */
+.loading-notice {
+  background: #3498db20;
+  border: 1px solid #3498db;
+  border-radius: 6px;
+  padding: 10px 15px;
+  margin-top: 10px;
+  color: #2980b9;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-indicator {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-style: italic;
+}
+
 .id-column {
   font-weight: 600;
   color: #1f998f;
