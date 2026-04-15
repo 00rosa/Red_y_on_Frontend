@@ -4,7 +4,6 @@
     <AppSidebar :isOpen="sidebarOpen" />
     
     <main :class="['main-content', { 'sidebar-open': sidebarOpen }]">
-      <!-- Mensaje de acceso denegado para no administradores -->
       <div v-if="!esAdministrador" class="access-denied">
         <div class="denied-card">
           <span class="denied-icon">🔒</span>
@@ -69,7 +68,7 @@
         </div>
 
         <div class="admin-content">
-          <!-- Formulario para nuevo usuario (solo visible para admins) -->
+          <!-- Formulario para nuevo usuario -->
           <div class="form-section">
             <div class="section-header">
               <h3>{{ editingUser ? 'Editar Usuario' : 'Crear Nuevo Usuario' }}</h3>
@@ -100,9 +99,6 @@
                     :required="!editingUser"
                     :disabled="submitting"
                   >
-                  <small class="password-hint">
-                    {{ editingUser ? 'Solo llenar para cambiar contraseña' : 'Requerida para nuevo usuario' }}
-                  </small>
                 </div>
                 
                 <div class="form-group">
@@ -111,12 +107,6 @@
                     <option value="operador">Operador</option>
                     <option value="administrador">Administrador</option>
                   </select>
-                  <small class="role-hint">
-                    {{
-                      userForm.role === 'administrador' ? 'Acceso total al sistema' :
-                      'Solo lectura y creación básica'
-                    }}
-                  </small>
                 </div>
                 
                 <div class="form-group">
@@ -140,86 +130,64 @@
                     :min="getCurrentDateMexico()"
                     :disabled="submitting"
                   >
-                  <small class="date-hint">
-                    {{ userForm.fechaExpiracion ? 'Expira: ' + formatDateMexico(userForm.fechaExpiracion) : 'Sin fecha de expiración' }}
-                  </small>
                 </div>
               </div>
 
-              <!-- PERMISOS ESPECÍFICOS PARA TABLES -->
+              <!-- PERMISOS -->
               <div class="permissions-section">
-                <h4>Permisos en Página Tables</h4>
+                <h4>Permisos</h4>
                 <div class="permissions-grid">
                   <div class="permission-category">
-                    <h5>Formulario de Registros</h5>
+                    <h5>Registros</h5>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.crearRegistros" :disabled="submitting">
-                        <span>Crear nuevos registros</span>
+                        <span>Crear registros</span>
                       </label>
-                      <small>Agregar registros en formulario</small>
                     </div>
-                  </div>
-                  
-                  <div class="permission-category">
-                    <h5>Visualización</h5>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.soloVer" :disabled="submitting">
-                        <span>Solo Ver registros</span>
+                        <span>Solo Ver</span>
                       </label>
-                      <small>No puede crear, editar ni eliminar</small>
                     </div>
-                  </div>
-                  
-                  <div class="permission-category">
-                    <h5>Comentarios</h5>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.editarComentarios" :disabled="submitting">
                         <span>Editar Comentarios</span>
                       </label>
-                      <small>Permite editar comentarios en registros</small>
                     </div>
-                  </div>
-                  
-                  <div class="permission-category">
-                    <h5>Impresión</h5>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.imprimir" :disabled="submitting">
-                        <span>Imprimir registros</span>
+                        <span>Imprimir</span>
                       </label>
-                      <small>Permite imprimir comprobantes</small>
                     </div>
                   </div>
                   
                   <div class="permission-category">
-                    <h5>Widgets de Caja</h5>
+                    <h5>Caja</h5>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.modificarCajaInicial" :disabled="submitting">
                         <span>Modificar Caja Inicial</span>
                       </label>
-                      <small>Editar presupuesto inicial</small>
                     </div>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.modificarDineroInicial" :disabled="submitting">
                         <span>Modificar Dinero Inicial</span>
                       </label>
-                      <small>Editar dinero disponible</small>
                     </div>
                   </div>
                   
                   <div class="permission-category">
-                    <h5>Exportación de Datos</h5>
+                    <h5>Exportación</h5>
                     <div class="permission-item">
                       <label>
                         <input type="checkbox" v-model="userForm.permissions.exportarDatos" :disabled="submitting">
                         <span>Exportar datos</span>
                       </label>
-                      <small>Exportar registros a Excel/CSV</small>
                     </div>
                   </div>
                 </div>
@@ -230,8 +198,7 @@
                   Limpiar
                 </button>
                 <button type="submit" class="btn-primary" :disabled="submitting">
-                  <span v-if="submitting">Guardando...</span>
-                  <span v-else>{{ editingUser ? '💾 Actualizar Usuario' : 'Crear Usuario' }}</span>
+                  {{ submitting ? 'Guardando...' : (editingUser ? '💾 Actualizar Usuario' : 'Crear Usuario') }}
                 </button>
               </div>
             </form>
@@ -247,7 +214,6 @@
                   v-model="searchQuery" 
                   placeholder="Buscar usuario..."
                   class="search-input"
-                  :disabled="loading"
                 >
                 <span class="search-icon">🔍</span>
               </div>
@@ -263,7 +229,7 @@
                     <th>Usuario</th>
                     <th>Rol</th>
                     <th>Estado</th>
-                    <th>Permisos Tables</th>
+                    <th>Permisos</th>
                     <th>Expiración</th>
                     <th>Acciones</th>
                   </tr>
@@ -277,7 +243,7 @@
                     </td>
                     <td>
                       <span :class="['role-tag', user.role]">
-                        {{ getRoleName(user.role) }}
+                        {{ user.role === 'administrador' ? 'Administrador' : 'Operador' }}
                       </span>
                     </td>
                     <td>
@@ -293,8 +259,7 @@
                         <button 
                           @click="viewPermissions(user)" 
                           class="btn-view-permissions"
-                          title="Ver permisos detallados"
-                          :disabled="updating"
+                          title="Ver permisos"
                         >
                           👁️
                         </button>
@@ -302,26 +267,25 @@
                     </td>
                     <td>
                       <span :class="['expiration', isExpiredMexico(user) ? 'expired' : 'valid']">
-                        {{ user.fechaExpiracion ? formatDateMexico(user.fechaExpiracion) : 'Sin expiración' }}
-                        <small v-if="isExpiredMexico(user)" class="expired-label">(Expirado)</small>
+                        {{ formatDateMexico(user.fechaExpiracion) }}
                       </span>
                     </td>
                     <td class="actions-cell">
                       <div class="action-buttons">
-                        <button @click="editUser(user)" class="btn-edit" title="Editar" :disabled="updating">
+                        <button @click="editUser(user)" class="btn-edit" title="Editar">
                           ✏️
                         </button>
                         <button 
-                          @click="toggleUserStatus(user)" 
+                          @click="handleToggleStatus(user)" 
                           :class="['btn-toggle', user.activo ? 'deactivate' : 'activate']"
                           :title="user.activo ? 'Desactivar' : 'Activar'"
-                          :disabled="updating"
+                          :disabled="user.username === 'admin' || updating"
                         >
                           {{ user.activo ? '⏸️' : '▶️' }}
                         </button>
                         <button 
-                          v-if="user.role !== 'administrador'" 
-                          @click="deleteUser(user.id)" 
+                          v-if="user.role !== 'administrador' && user.username !== 'admin'" 
+                          @click="handleDeleteUser(user.id)" 
                           class="btn-delete"
                           title="Eliminar"
                           :disabled="updating"
@@ -352,35 +316,17 @@
             <div class="modal-body">
               <div class="permissions-detail">
                 <div class="permission-group">
-                  <h4>Formulario:</h4>
+                  <h4>Registros:</h4>
                   <ul>
                     <li :class="selectedUser?.permissions.crearRegistros ? 'allowed' : 'denied'">
                       {{ selectedUser?.permissions.crearRegistros ? '✅' : '❌' }} Crear registros
                     </li>
-                  </ul>
-                </div>
-                
-                <div class="permission-group">
-                  <h4>Visualización:</h4>
-                  <ul>
                     <li :class="selectedUser?.permissions.soloVer ? 'allowed' : 'denied'">
                       {{ selectedUser?.permissions.soloVer ? '✅' : '❌' }} Solo Ver
                     </li>
-                  </ul>
-                </div>
-                
-                <div class="permission-group">
-                  <h4>Comentarios:</h4>
-                  <ul>
                     <li :class="selectedUser?.permissions.editarComentarios ? 'allowed' : 'denied'">
                       {{ selectedUser?.permissions.editarComentarios ? '✅' : '❌' }} Editar Comentarios
                     </li>
-                  </ul>
-                </div>
-                
-                <div class="permission-group">
-                  <h4>Impresión:</h4>
-                  <ul>
                     <li :class="selectedUser?.permissions.imprimir ? 'allowed' : 'denied'">
                       {{ selectedUser?.permissions.imprimir ? '✅' : '❌' }} Imprimir
                     </li>
@@ -410,9 +356,7 @@
               </div>
             </div>
             <div class="modal-footer">
-              <button @click="closeModal" class="btn-close-modal">
-                Cerrar
-              </button>
+              <button @click="closeModal" class="btn-close-modal">Cerrar</button>
             </div>
           </div>
         </div>
@@ -432,7 +376,7 @@ import {
   updateUser, 
   deleteUser,
   toggleUserStatus 
-} from '@/api' // IMPORTAR funciones de API
+} from '@/api'
 
 export default {
   name: 'AdminUsersView',
@@ -448,18 +392,16 @@ export default {
     const showPermissionsModal = ref(false)
     const selectedUser = ref(null)
     
-    // Estados de carga
     const loading = ref(false)
     const submitting = ref(false)
     const updating = ref(false)
+    const users = ref([])
 
-    // Verificar si el usuario actual es administrador
     const esAdministrador = computed(() => {
       const userRole = localStorage.getItem('userRole')
       return userRole === 'administrador'
     })
 
-    // Formulario de usuario
     const userForm = ref({
       username: '',
       password: '',
@@ -467,33 +409,18 @@ export default {
       activo: true,
       fechaExpiracion: '',
       permissions: {
-        crearRegistros: false,
+        crearRegistros: true,
         soloVer: false,
-        editarComentarios: false,
-        imprimir: false,
+        editarComentarios: true,
+        imprimir: true,
         modificarCajaInicial: false,
         modificarDineroInicial: false,
         exportarDatos: false
       }
     })
 
-    // Lista de usuarios
-    const users = ref([])
-
-    // Cargar datos al iniciar
-    onMounted(() => {
-      if (esAdministrador.value) {
-        loadUsersFromAPI()
-      }
-    })
-
-    const volverAlDashboard = () => {
-      router.push('/dashboard')
-    }
-
     // ========== FUNCIONES DE API ==========
-
-    // Cargar usuarios desde API
+    
     const loadUsersFromAPI = async () => {
       loading.value = true
       try {
@@ -501,20 +428,80 @@ export default {
         users.value = data
       } catch (error) {
         console.error('Error cargando usuarios:', error)
-        alert('Error al cargar usuarios')
+        alert('Error al cargar usuarios: ' + (error.mensaje || error.message))
       } finally {
         loading.value = false
       }
     }
 
-    // Guardar usuario (crear o actualizar)
+    const handleToggleStatus = async (user) => {
+      if (!esAdministrador.value) {
+        alert('❌ No tienes permiso para cambiar el estado de usuarios')
+        return
+      }
+
+      if (user.username === 'admin') {
+        alert('No se puede desactivar el usuario administrador principal')
+        return
+      }
+
+      const nuevoEstado = !user.activo
+      const accion = nuevoEstado ? 'activar' : 'desactivar'
+      
+      if (!confirm(`¿Está seguro de ${accion} al usuario "${user.username}"?`)) {
+        return
+      }
+
+      updating.value = true
+      try {
+        await toggleUserStatus(user.id, nuevoEstado)
+        await loadUsersFromAPI()
+        alert(`✅ Usuario ${accion}do correctamente`)
+      } catch (error) {
+        console.error('Error:', error)
+        alert('❌ ' + (error.mensaje || 'Error al cambiar estado'))
+      } finally {
+        updating.value = false
+      }
+    }
+
+    const handleDeleteUser = async (id) => {
+      if (!esAdministrador.value) {
+        alert('❌ No tienes permiso para eliminar usuarios')
+        return
+      }
+
+      const user = users.value.find(u => u.id === id)
+      if (!user) return
+
+      if (user.username === 'admin') {
+        alert('No se puede eliminar el usuario administrador principal')
+        return
+      }
+
+      if (!confirm(`¿Está seguro de eliminar al usuario "${user.username}"? Esta acción no se puede deshacer.`)) {
+        return
+      }
+
+      updating.value = true
+      try {
+        await deleteUser(id)
+        await loadUsersFromAPI()
+        alert('✅ Usuario eliminado correctamente')
+      } catch (error) {
+        console.error('Error:', error)
+        alert('❌ ' + (error.mensaje || 'Error al eliminar usuario'))
+      } finally {
+        updating.value = false
+      }
+    }
+
     const saveUser = async () => {
       if (!esAdministrador.value) {
         alert('❌ No tienes permiso para crear/modificar usuarios')
         return
       }
 
-      // Validaciones
       if (!userForm.value.username.trim()) {
         alert('El nombre de usuario es requerido')
         return
@@ -528,7 +515,6 @@ export default {
       submitting.value = true
       try {
         if (editingUser.value) {
-          // Actualizar usuario existente
           await updateUser(editingUser.value.id, {
             username: userForm.value.username,
             role: userForm.value.role,
@@ -539,7 +525,6 @@ export default {
           })
           alert('✅ Usuario actualizado')
         } else {
-          // Crear nuevo usuario
           await createUser({
             username: userForm.value.username,
             password: userForm.value.password,
@@ -560,66 +545,7 @@ export default {
       }
     }
 
-    // Cambiar estado del usuario
-    const toggleUserStatus = async (user) => {
-      if (!esAdministrador.value) {
-        alert('❌ No tienes permiso para cambiar el estado de usuarios')
-        return
-      }
-
-      if (user.username === 'admin') {
-        alert('No se puede desactivar el usuario administrador principal')
-        return
-      }
-
-      updating.value = true
-      try {
-        await toggleUserStatus(user.id, !user.activo)
-        await loadUsersFromAPI()
-        alert(`✅ Usuario ${!user.activo ? 'activado' : 'desactivado'}`)
-      } catch (error) {
-        alert('❌ ' + (error.mensaje || 'Error al cambiar estado'))
-      } finally {
-        updating.value = false
-      }
-    }
-
-    // Eliminar usuario
-    const deleteUser = async (id) => {
-      if (!esAdministrador.value) {
-        alert('❌ No tienes permiso para eliminar usuarios')
-        return
-      }
-
-      const user = users.value.find(u => u.id === id)
-      if (!user) return
-
-      if (user.username === 'admin') {
-        alert('No se puede eliminar el usuario administrador principal')
-        return
-      }
-
-      if (confirm(`¿Está seguro de eliminar al usuario "${user.username}"?`)) {
-        updating.value = true
-        try {
-          await deleteUser(id)
-          await loadUsersFromAPI()
-          alert('✅ Usuario eliminado')
-        } catch (error) {
-          alert('❌ ' + (error.mensaje || 'Error al eliminar'))
-        } finally {
-          updating.value = false
-        }
-      }
-    }
-
-    // ========== FUNCIONES DE FORMULARIO ==========
-
     const editUser = (user) => {
-      if (!esAdministrador.value) {
-        alert('❌ No tienes permiso para editar usuarios')
-        return
-      }
       editingUser.value = user
       userForm.value = {
         username: user.username,
@@ -629,8 +555,7 @@ export default {
         fechaExpiracion: user.fechaExpiracion || '',
         permissions: { ...user.permissions }
       }
-      
-      document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' })
+      document.querySelector('.form-section')?.scrollIntoView({ behavior: 'smooth' })
     }
 
     const cancelEdit = () => {
@@ -659,98 +584,90 @@ export default {
     }
 
     const onRoleChange = () => {
-      switch(userForm.value.role) {
-        case 'administrador':
-          userForm.value.permissions = {
-            crearRegistros: true,
-            soloVer: false,
-            editarComentarios: true,
-            imprimir: true,
-            modificarCajaInicial: true,
-            modificarDineroInicial: true,
-            exportarDatos: true
-          }
-          break
-          
-        case 'operador':
-          userForm.value.permissions = {
-            crearRegistros: true,
-            soloVer: false,
-            editarComentarios: true,
-            imprimir: true,
-            modificarCajaInicial: false,
-            modificarDineroInicial: false,
-            exportarDatos: false
-          }
-          break
+      if (userForm.value.role === 'administrador') {
+        userForm.value.permissions = {
+          crearRegistros: true,
+          soloVer: false,
+          editarComentarios: true,
+          imprimir: true,
+          modificarCajaInicial: true,
+          modificarDineroInicial: true,
+          exportarDatos: true
+        }
+      } else {
+        userForm.value.permissions = {
+          crearRegistros: true,
+          soloVer: false,
+          editarComentarios: true,
+          imprimir: true,
+          modificarCajaInicial: false,
+          modificarDineroInicial: false,
+          exportarDatos: false
+        }
       }
     }
 
     // ========== FUNCIONES DE UTILIDAD ==========
-
-    // Funciones para horario México
+    
     const getCurrentDateMexico = () => {
       const now = new Date()
-      const offsetMexico = -6 * 60
-      const utc = now.getTime() + (now.getTimezoneOffset() * 60000)
-      const fechaMexico = new Date(utc + (offsetMexico * 60000))
-      
-      const año = fechaMexico.getFullYear()
-      const mes = String(fechaMexico.getMonth() + 1).padStart(2, '0')
-      const dia = String(fechaMexico.getDate()).padStart(2, '0')
-      
+      const año = now.getFullYear()
+      const mes = String(now.getMonth() + 1).padStart(2, '0')
+      const dia = String(now.getDate()).padStart(2, '0')
       return `${año}-${mes}-${dia}`
     }
 
-    const getFechaMexico = (fechaString) => {
-      if (!fechaString) return new Date()
-      
-      const fecha = new Date(fechaString)
-      const offsetMexico = -6 * 60
-      const utc = fecha.getTime() + (fecha.getTimezoneOffset() * 60000)
-      return new Date(utc + (offsetMexico * 60000))
-    }
-
+    // ✅ FUNCIÓN MEJORADA - Formato de fecha sin hora
     const formatDateMexico = (dateString) => {
-      if (!dateString) return ''
+      if (!dateString) return 'Sin expiración'
       
       try {
-        if (dateString.includes('-')) {
-          const [año, mes, dia] = dateString.split('-')
+        // Si la fecha viene en formato ISO (YYYY-MM-DD) o con hora
+        let fechaStr = dateString
+        
+        // Si contiene 'T', tomar solo la parte de la fecha (antes de la T)
+        if (fechaStr.includes('T')) {
+          fechaStr = fechaStr.split('T')[0]
+        }
+        
+        // Si ya viene en formato YYYY-MM-DD
+        if (fechaStr.includes('-')) {
+          const partes = fechaStr.split('-')
+          if (partes.length >= 3) {
+            // Formato: año, mes, día
+            return `${partes[2]}/${partes[1]}/${partes[0]}`
+          }
+        }
+        
+        // Intentar parsear como Date
+        const fecha = new Date(dateString)
+        if (!isNaN(fecha.getTime())) {
+          const dia = String(fecha.getDate()).padStart(2, '0')
+          const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+          const año = fecha.getFullYear()
           return `${dia}/${mes}/${año}`
         }
         
-        const fechaMexico = getFechaMexico(dateString)
-        const dia = String(fechaMexico.getDate()).padStart(2, '0')
-        const mes = String(fechaMexico.getMonth() + 1).padStart(2, '0')
-        const año = fechaMexico.getFullYear()
-        
-        return `${dia}/${mes}/${año}`
-      } catch (error) {
-        console.error('Error formateando fecha:', dateString, error)
         return dateString
+      } catch {
+        return dateString || 'Sin expiración'
       }
     }
 
     const isExpiredMexico = (user) => {
       if (!user.fechaExpiracion) return false
-      
-      const hoyMexico = getFechaMexico(getCurrentDateMexico())
-      hoyMexico.setHours(0, 0, 0, 0)
-      
-      const expDate = getFechaMexico(user.fechaExpiracion)
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      const expDate = new Date(user.fechaExpiracion)
       expDate.setHours(0, 0, 0, 0)
-      
-      return expDate < hoyMexico
+      return expDate < hoy
     }
 
-    // Computed properties
     const totalUsers = computed(() => users.value.length)
     const activeUsers = computed(() => users.value.filter(u => u.activo).length)
     const adminUsers = computed(() => users.value.filter(u => u.role === 'administrador').length)
     const operatorUsers = computed(() => users.value.filter(u => u.role === 'operador').length)
 
-    // Búsqueda
     const filteredUsers = computed(() => {
       if (!searchQuery.value) return users.value
       const query = searchQuery.value.toLowerCase()
@@ -760,7 +677,20 @@ export default {
       )
     })
 
-    // Funciones de modal
+    const countActivePermissions = (permissions) => {
+      if (!permissions) return 0
+      const active = [
+        permissions.crearRegistros,
+        permissions.soloVer,
+        permissions.editarComentarios,
+        permissions.imprimir,
+        permissions.modificarCajaInicial,
+        permissions.modificarDineroInicial,
+        permissions.exportarDatos
+      ]
+      return active.filter(p => p === true).length
+    }
+
     const viewPermissions = (user) => {
       selectedUser.value = user
       showPermissionsModal.value = true
@@ -771,31 +701,19 @@ export default {
       selectedUser.value = null
     }
 
-    const countActivePermissions = (permissions) => {
-      if (!permissions) return 0
-      const soloLosSiete = [
-        permissions.crearRegistros,
-        permissions.soloVer,
-        permissions.editarComentarios,
-        permissions.imprimir,
-        permissions.modificarCajaInicial,
-        permissions.modificarDineroInicial,
-        permissions.exportarDatos
-      ]
-      return soloLosSiete.filter(p => p === true).length
-    }
-
-    const getRoleName = (role) => {
-      switch(role) {
-        case 'administrador': return 'Administrador'
-        case 'operador': return 'Operador'
-        default: return role
-      }
+    const volverAlDashboard = () => {
+      router.push('/dashboard')
     }
 
     const toggleSidebar = () => {
       sidebarOpen.value = !sidebarOpen.value
     }
+
+    onMounted(() => {
+      if (esAdministrador.value) {
+        loadUsersFromAPI()
+      }
+    })
 
     return {
       sidebarOpen,
@@ -820,15 +738,14 @@ export default {
       editUser,
       cancelEdit,
       resetForm,
-      toggleUserStatus,
-      deleteUser,
+      handleToggleStatus,
+      handleDeleteUser,
       viewPermissions,
       closeModal,
       countActivePermissions,
       isExpiredMexico,
       formatDateMexico,
       getCurrentDateMexico,
-      getRoleName,
       volverAlDashboard
     }
   }

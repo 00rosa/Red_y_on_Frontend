@@ -1,4 +1,3 @@
-// src/api/index.js
 import axios from 'axios'
 
 const api = axios.create({
@@ -9,21 +8,41 @@ const api = axios.create({
   }
 })
 
-// Interceptor para agregar token (si lo implementas después)
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+// ============ INTERCEPTOR CORREGIDO ============
+api.interceptors.response.use(
+  response => {
+    // Transformar PascalCase a camelCase (SOLO para datos)
+    if (response.data && typeof response.data === 'object') {
+      const transformKeys = (obj) => {
+        if (Array.isArray(obj)) {
+          return obj.map(item => transformKeys(item))
+        }
+        if (obj !== null && typeof obj === 'object') {
+          const newObj = {}
+          Object.keys(obj).forEach(key => {
+            const newKey = key.charAt(0).toLowerCase() + key.slice(1)
+            newObj[newKey] = transformKeys(obj[key])
+          })
+          return newObj
+        }
+        return obj
+      }
+      response.data = transformKeys(response.data)
+    }
+    return response
+  },
+  error => {
+    if (error.code === 'ECONNABORTED' || !error.response) {
+      console.error('❌ Error de conexión con el servidor')
+    }
+    return Promise.reject(error)
   }
-  return config
-})
+)
 
 // ============ AUTENTICACIÓN ============
 export const login = async (identifier, password) => {
   try {
     const response = await api.post('/auth/login', { identifier, password })
-    
-    // El backend NO devuelve token, solo datos del usuario
     if (response.data) {
       localStorage.setItem('userRole', response.data.role)
       localStorage.setItem('currentUsername', response.data.username)
@@ -35,7 +54,6 @@ export const login = async (identifier, password) => {
       }))
       localStorage.setItem('isAuthenticated', 'true')
     }
-    
     return response.data
   } catch (error) {
     throw error.response?.data || error
@@ -64,18 +82,42 @@ export const getRecords = async (usuarioId = null, periodo = null) => {
   }
 }
 
-export const getRecordById = async (id) => {
+export const updateRecordComment = async (id, usuarioId, comentario) => {
   try {
-    const response = await api.get(`/registros/${id}`)
+    const response = await api.put(`/registros/${id}`, { usuarioId, comentario })
     return response.data
   } catch (error) {
     throw error.response?.data || error
   }
 }
 
-export const updateRecordComment = async (id, usuarioId, comentario) => {
+// ============ CAJA (CORREGIDO) ============
+// ✅ CORREGIDO: No envía usuarioId porque la caja es GLOBAL
+export const getCajaData = async () => {
   try {
-    const response = await api.put(`/registros/${id}`, { usuarioId, comentario })
+    const response = await api.get('/caja')
+    console.log('📦 Respuesta de /caja:', response.data)
+    return response.data
+  } catch (error) {
+    console.error('❌ Error getCajaData:', error)
+    throw error.response?.data || error
+  }
+}
+
+// ✅ CORREGIDO: No necesita usuarioId
+export const updateCajaInicial = async (nuevoValor) => {
+  try {
+    const response = await api.put('/caja/inicial', { nuevoValor })
+    return response.data
+  } catch (error) {
+    throw error.response?.data || error
+  }
+}
+
+// ✅ CORREGIDO: No necesita usuarioId
+export const updateDineroInicial = async (nuevoValor) => {
+  try {
+    const response = await api.put('/caja/dinero', { nuevoValor })
     return response.data
   } catch (error) {
     throw error.response?.data || error
@@ -101,7 +143,7 @@ export const getMetodosPago = async () => {
   }
 }
 
-// ============ ADMINISTRACIÓN DE USUARIOS ============
+// ============ ADMINISTRACIÓN ============
 export const getUsers = async () => {
   try {
     const response = await api.get('/admin/usuarios')
@@ -150,7 +192,7 @@ export const toggleUserStatus = async (id, activo) => {
 }
 
 // ============ GRÁFICAS ============
-export const getDashboardData = async (usuarioId, periodo = 'week') => {
+export const getChartData = async (usuarioId, periodo = 'week') => {
   try {
     const response = await api.get('/graficas/dashboard', { 
       params: { usuarioId, periodo } 
@@ -161,43 +203,8 @@ export const getDashboardData = async (usuarioId, periodo = 'week') => {
   }
 }
 
-export const getChartData = async (usuarioId, periodo = 'week') => {
-  try {
-    const response = await api.get(`/graficas/${periodo}`, { 
-      params: { usuarioId } 
-    })
-    return response.data
-  } catch (error) {
-    throw error.response?.data || error
-  }
-}
-
-// ============ CAJA (si lo implementas después) ============
-export const getCajaData = async (usuarioId) => {
-  try {
-    const response = await api.get(`/caja/${usuarioId}`)
-    return response.data
-  } catch (error) {
-    throw error.response?.data || error
-  }
-}
-
-export const updateCajaInicial = async (usuarioId, nuevoValor) => {
-  try {
-    const response = await api.put('/caja/inicial', { usuarioId, nuevoValor })
-    return response.data
-  } catch (error) {
-    throw error.response?.data || error
-  }
-}
-
-export const updateDineroInicial = async (usuarioId, nuevoValor) => {
-  try {
-    const response = await api.put('/caja/dinero', { usuarioId, nuevoValor })
-    return response.data
-  } catch (error) {
-    throw error.response?.data || error
-  }
+export const getDashboardData = async (usuarioId, periodo = 'week') => {
+  return getChartData(usuarioId, periodo)
 }
 
 export default api
